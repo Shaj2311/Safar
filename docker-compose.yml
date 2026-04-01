@@ -1,0 +1,13 @@
+services:
+  database:
+    build:
+      context: ./db
+    container_name: safar_postgres_db
+    ports:
+      - "5432:5432"
+    env_file:
+      - ./db/.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:
