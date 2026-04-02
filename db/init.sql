@@ -165,3 +165,22 @@ CREATE TABLE LocationHistory (
     FOREIGN KEY (trip_id)
       REFERENCES Trip(trip_id)
 );
+
+INSERT INTO Driver (name, password, cnic, phone_no) VALUES 
+('Driver 1', 'pass1', '11111-1111111-1', '03001111111'),
+('Driver 2', 'pass2', '22222-2222222-2', '03002222222');
+
+INSERT INTO Passenger (name, password, cnic, phone_no) VALUES 
+('Passenger A', 'passA', '33333-3333333-3', '03003333333'),
+('Passenger B', 'passB', '44444-4444444-4', '03004444444');
+
+INSERT INTO Vehicle (driver_id, make, model, engine_no, chassis_no, plate_no) VALUES 
+(1, 'Toyota', 'Corolla', 'ENG001', 'CHA001', 'ABC-001'),
+(2, 'Honda', 'Civic', 'ENG002', 'CHA002', 'XYZ-002');
+
+INSERT INTO Staff (name, password, cnic, phone_no, role) VALUES 
+('Admin 1', 'adminpass', '55555-5555555-5', '03005555555', 'admin'),
+('Support 1', 'supportpass', '66666-6666666-6', '03006666666', 'support');
+
+INSERT INTO Trip (passenger_id, driver_id, pickup_loc, dropoff_loc, estimated_dist) VALUES 
+(1, 1, point(0,0), point(1,1), 10.0);
