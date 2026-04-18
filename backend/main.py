@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from backend.routes import auth, users, rides, drivers, history, comms, staff
+from backend.routes import auth, users, rides, drivers, history, comms
+from backend.routes.staff import admin, superAdmin, support, staff
 
 app = FastAPI()
 
@@ -9,6 +10,9 @@ app.include_router(rides.router)
 app.include_router(drivers.router)
 app.include_router(history.router)
 app.include_router(comms.router)
+app.include_router(admin.router)
+app.include_router(support.router)
+app.include_router(superAdmin.router)
 app.include_router(staff.router)
 
 @app.get("/")
