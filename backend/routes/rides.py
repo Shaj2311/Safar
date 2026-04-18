@@ -32,13 +32,24 @@ async def updateLocation(sessionKey: str, id: int, gpsData: dict):
 
 
 @router.patch("/{id}/start")
-async def startTrip(sessionKey: str, id: int):
+async def startRide(sessionKey: str, id: int):
     return {"rideId": id, "status": "In progress"}
 
 
 @router.patch("/{id}/end")
-async def endTrip(sessionKey: str, id: int):
+async def endRide(sessionKey: str, id: int):
     return {"rideId": id, "status": "Completed"}
+
+
+@router.post("/rides/{id}/confirm-payment")
+async def confirmPayment(sessionKey: str, id: int):
+    """Called by driver at end of ride to confirm that they've been paid"""
+    return {"id": id, "paymentStatus": "Paid"}
+
+
+@router.get("/{id}/summary")
+async def getCompletedRideSummary(sessionKey: str, id: int):
+    return {"fare": 0, "dist": 0}
 
 
 @router.post("/{id}/rate")

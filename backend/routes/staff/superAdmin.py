@@ -2,13 +2,6 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/super", tags=["Super Admin"])
 
-#@router.get("/users/{role}/{id}")
-@router.get("/users/{id}")
-async def superViewUser(sessionKey: str, role: str, id: int):
-    """View any user (driver, passenger, support, admin)."""
-    return {"role": role, "id": id, "audit": "Complete system history"}
-
-
 #@router.delete("/users/{role}/{id}")
 @router.delete("/users/{id}")
 async def superDeleteUser(sessionKey: str, role: str, id: int):
