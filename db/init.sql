@@ -10,28 +10,30 @@ DROP TABLE IF EXISTS Staff;
 DROP TABLE IF EXISTS Passenger;
 DROP TABLE IF EXISTS Driver;
 
-CREATE TABLE Driver (
-  driver_id bigint generated always as identity,
+
+CREATE TABLE AppUser (
+  user_id bigint generated always as identity,
   name varchar not null,
   password varchar not null,
+  PRIMARY KEY (user_id)
+);
+
+CREATE TABLE Driver (
+  driver_id bigint PRIMARY KEY REFERENCES AppUser(user_id) ON DELETE CASCADE,
   cnic varchar,
   phone_no varchar(20) not null,
   is_deleted boolean not null default false,
   inserted_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  PRIMARY KEY (driver_id)
+  updated_at timestamptz not null default now()
 );
 
 CREATE TABLE Passenger (
-  passenger_id bigint generated always as identity,
-  name varchar not null,
-  password varchar not null,
+  passenger_id bigint PRIMARY KEY REFERENCES AppUser(user_id) ON DELETE CASCADE,
   cnic varchar,
   phone_no varchar(20) not null,
   is_deleted boolean not null default false,
   inserted_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  PRIMARY KEY (passenger_id)
+  updated_at timestamptz not null default now()
 );
 
 CREATE TABLE Trip (
@@ -57,16 +59,13 @@ CREATE TABLE Trip (
 );
 
 CREATE TABLE Staff (
-  staff_id bigint generated always as identity,
-  name varchar not null,
-  password varchar not null,
+  staff_id bigint PRIMARY KEY REFERENCES AppUser(user_id) ON DELETE CASCADE,
   cnic varchar,
   phone_no varchar(20) not null,
   role varchar(20) not null check (role in ('admin', 'support')),
   is_deleted boolean not null default false,
   inserted_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  PRIMARY KEY (staff_id)
+  updated_at timestamptz not null default now()
 );
 
 CREATE TABLE Ticket (
@@ -166,21 +165,80 @@ CREATE TABLE LocationHistory (
       REFERENCES Trip(trip_id)
 );
 
-INSERT INTO Driver (name, password, cnic, phone_no) VALUES 
-('Driver 1', 'pass1', '11111-1111111-1', '03001111111'),
-('Driver 2', 'pass2', '22222-2222222-2', '03002222222');
 
-INSERT INTO Passenger (name, password, cnic, phone_no) VALUES 
-('Passenger A', 'passA', '33333-3333333-3', '03003333333'),
-('Passenger B', 'passB', '44444-4444444-4', '03004444444');
 
-INSERT INTO Vehicle (driver_id, make, model, engine_no, chassis_no, plate_no) VALUES 
+-- Insert Drivers
+WITH new_user AS (
+    INSERT INTO AppUser (name, password)
+    VALUES ('Driver A', 'pass1')
+    RETURNING user_id
+)
+INSERT INTO Driver (user_id, cnic, phone_no)
+SELECT user_id, '11111-1111111-1', '01001111111'
+FROM new_user;
+
+WITH new_user AS (
+    INSERT INTO AppUser (name, password)
+    VALUES ('Driver B', 'pass2')
+    RETURNING user_id
+)
+INSERT INTO Driver (user_id, cnic, phone_no)
+SELECT user_id, '22222-2222222-2', '02002222222'
+FROM new_user;
+
+
+
+-- Insert Passengers
+WITH new_user AS (
+    INSERT INTO AppUser (name, password)
+    VALUES ('Passenger A', 'passA')
+    RETURNING user_id
+)
+INSERT INTO Passenger (user_id, cnic, phone_no)
+SELECT user_id, '33333-3333333-3', '03003333333'
+FROM new_user;
+
+
+WITH new_user AS (
+    INSERT INTO AppUser (name, password)
+    VALUES ('Passenger B', 'passB')
+    RETURNING user_id
+)
+INSERT INTO Passenger (user_id, cnic, phone_no)
+SELECT user_id, '44444-4444444-4', '04004444444'
+FROM new_user;
+
+
+
+
+INSERT INTO Vehicle (driver_id, make, model, engine_no, chassis_no, plate_no) VALUES
 (1, 'Toyota', 'Corolla', 'ENG001', 'CHA001', 'ABC-001'),
 (2, 'Honda', 'Civic', 'ENG002', 'CHA002', 'XYZ-002');
 
-INSERT INTO Staff (name, password, cnic, phone_no, role) VALUES 
-('Admin 1', 'adminpass', '55555-5555555-5', '03005555555', 'admin'),
-('Support 1', 'supportpass', '66666-6666666-6', '03006666666', 'support');
 
-INSERT INTO Trip (passenger_id, driver_id, pickup_loc, dropoff_loc, estimated_dist) VALUES 
-(1, 1, point(0,0), point(1,1), 10.0);
+
+
+-- Insert Staff
+WITH new_user AS (
+    INSERT INTO AppUser (name, password)
+    VALUES ('Admin 1', 'adminpass')
+    RETURNING user_id
+)
+INSERT INTO Staff (user_id, cnic, phone_no, role)
+SELECT user_id, '55555-5555555-5', '05005555555', 'admin'
+FROM new_user;
+
+
+WITH new_user AS (
+    INSERT INTO AppUser (name, password)
+    VALUES ('Support 1', 'supportpass')
+    RETURNING user_id
+)
+INSERT INTO Staff (user_id, cnic, phone_no, role)
+SELECT user_id, '66666-6666666-6', '06006666666', 'support'
+FROM new_user;
+
+
+
+INSERT INTO Trip (passenger_id, driver_id, pickup_loc, dropoff_loc, estimated_dist) VALUES
+(3, 1, point(0,0), point(1,1), 10.0);
