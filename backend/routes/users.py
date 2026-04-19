@@ -1,10 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/users", tags=["User Profiles"])
 
-@router.get("/me")
-async def getProfile(sessionKey: str):
-    return {"id": 1, "username": "foo"}
 
 @router.patch("/me")
 async def updateProfile(sessionKey: str, updates: dict):

@@ -22,10 +22,11 @@ app.include_router(superAdmin.router)
 app.include_router(staff.router)
 
 
+
+
 # Connect to DB at startup
 @app.on_event("startup")
 async def startup():
-    print("Connecting!")
     app.state.db = await asyncpg.create_pool(
             user=os.getenv("POSTGRES_USER"),
             password=os.getenv("POSTGRES_PASSWORD"),
@@ -37,7 +38,6 @@ async def startup():
 # Disconnect from DB at shutdown
 @app.on_event("shutdown")
 async def shutdown():
-    print("Disconecting!")
     await app.state.db.close()
 
 
