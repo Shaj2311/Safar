@@ -174,7 +174,7 @@ WITH new_user AS (
     VALUES ('Driver A', 'pass1')
     RETURNING user_id
 )
-INSERT INTO Driver (user_id, cnic, phone_no)
+INSERT INTO Driver (driver_id, cnic, phone_no)
 SELECT user_id, '11111-1111111-1', '01001111111'
 FROM new_user;
 
@@ -183,7 +183,7 @@ WITH new_user AS (
     VALUES ('Driver B', 'pass2')
     RETURNING user_id
 )
-INSERT INTO Driver (user_id, cnic, phone_no)
+INSERT INTO Driver (driver_id, cnic, phone_no)
 SELECT user_id, '22222-2222222-2', '02002222222'
 FROM new_user;
 
@@ -195,7 +195,7 @@ WITH new_user AS (
     VALUES ('Passenger A', 'passA')
     RETURNING user_id
 )
-INSERT INTO Passenger (user_id, cnic, phone_no)
+INSERT INTO Passenger (passenger_id, cnic, phone_no)
 SELECT user_id, '33333-3333333-3', '03003333333'
 FROM new_user;
 
@@ -205,7 +205,7 @@ WITH new_user AS (
     VALUES ('Passenger B', 'passB')
     RETURNING user_id
 )
-INSERT INTO Passenger (user_id, cnic, phone_no)
+INSERT INTO Passenger (passenger_id, cnic, phone_no)
 SELECT user_id, '44444-4444444-4', '04004444444'
 FROM new_user;
 
@@ -225,7 +225,7 @@ WITH new_user AS (
     VALUES ('Admin 1', 'adminpass')
     RETURNING user_id
 )
-INSERT INTO Staff (user_id, cnic, phone_no, role)
+INSERT INTO Staff (staff_id, cnic, phone_no, role)
 SELECT user_id, '55555-5555555-5', '05005555555', 'admin'
 FROM new_user;
 
@@ -235,7 +235,7 @@ WITH new_user AS (
     VALUES ('Support 1', 'supportpass')
     RETURNING user_id
 )
-INSERT INTO Staff (user_id, cnic, phone_no, role)
+INSERT INTO Staff (staff_id, cnic, phone_no, role)
 SELECT user_id, '66666-6666666-6', '06006666666', 'support'
 FROM new_user;
 
