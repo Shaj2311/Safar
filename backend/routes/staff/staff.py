@@ -1,134 +1,168 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from dependencies import get_db
+from state import sessions
+from typing import Optional
 
 router = APIRouter(prefix="/staff", tags=["Staff"])
 
 # Rides
 
 @router.get("/rides")
-async def staffViewRides(sessionKey: str, searchStr: str | None = None, filters: dict | None = None, db = Depends(get_db)):
+async def staffViewRides(sessionKey: str, searchStr: Optional[str] = None, status: Optional[str] = None, minFare: Optional[float] = None, maxFare: Optional[float] = None,db = Depends(get_db)):
+    if sessionKey not in sessions:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
     async with db.acquire() as conn:
-        # Not implementing filtering yet
-
-        # Base query
         query = """
-            SELECT
-                t.trip_id,
-                p.name as passenger_name,
-                d.name as driver_name,
-                t.pickup_loc, 
-                t.dropoff_loc
-            FROM Trip t
-            LEFT JOIN AppUser p ON t.passenger_id = p.user_id
-            LEFT JOIN AppUser d ON t.driver_id = d.user_id
-            WHERE 1=1
+            select t.trip_id, t.pickup_loc, t.dropoff_loc, t.end_time, t.is_deleted,
+                   p.actual_fare, u_p.name as passenger_name, u_d.name as driver_name
+            from trip t
+            left join payment p on t.trip_id = p.trip_id
+            left join appuser u_p on t.passenger_id = u_p.user_id
+            left join appuser u_d on t.driver_id = u_d.user_id
+            where 1=1
         """
-
         params = []
         counter = 1
 
-        # Search
+        # search
         if searchStr:
-            query += f" and (t.trip_id::text ILIKE ${counter} or p.name ILIKE ${counter} or d.name ILIKE ${counter})"
+            query += f" and (t.trip_id::text ilike ${counter} or u_p.name ilike ${counter} or u_d.name ilike ${counter})"
             params.append(f"%{searchStr}%")
             counter += 1
 
-        ## Filter
-        #if filters:
-        #    for key, value in filters.items():
-        #        # Safety check: Ensure the key is a valid column to prevent injection
-        #        if key in ["status", "passenger_id", "driver_id"]:
-        #            query += f" AND t.{key} = ${counter}"
-        #            params.append(value)
-        #            counter += 1
+        # filters
+        if status == "completed":
+            query += " and t.end_time is not null"
+        elif status == "pending":
+            query += " and t.end_time is null"
 
-        query += " ORDER BY t.inserted_at DESC"
+        if minFare is not None:
+            query += f" and p.actual_fare >= ${counter}"
+            params.append(minFare)
+            counter += 1
 
-        rides = await conn.fetch(query, *params)
-        if not rides:
-            return {"Error": "No matching rides"}
-        return [dict(row) for row in rides]
+        if maxFare is not None:
+            query += f" and p.actual_fare <= ${counter}"
+            params.append(maxFare)
+            counter += 1
 
+        # ordering
+        query += " order by t.inserted_at desc"
+        rows = await conn.fetch(query, *params)
 
+        # Point conversion
+        results = []
+        for row in rows:
+            p_loc = row["pickup_loc"]
+            d_loc = row["dropoff_loc"]
+
+            # format data
+            ride_status = "live"
+            if row["end_time"]: ride_status = "completed"
+            if row["is_deleted"]: ride_status = "cancelled"
+
+            results.append({
+                "tripId": row["trip_id"],
+                "passenger": row["passenger_name"],
+                "driver": row["driver_name"],
+                "status": ride_status,
+                "pickup": {"x": p_loc.x, "y": p_loc.y},
+                "dropoff": {"x": d_loc.x, "y": d_loc.y},
+                "fare": float(row["actual_fare"]) if row["actual_fare"] else 0.0
+                })
+        return results
 
 
 @router.get("/rides/{id}")
 async def staffViewRideDetails(sessionKey: str, id: int, db = Depends(get_db)):
+    if sessionKey not in sessions:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
     async with db.acquire() as conn:
         query = """
             select
-            t.trip_id,
-            t.passenger_id, p.name passenger_name,
-            t.driver_id, d.name driver_name,
-            t.start_time, t.end_time,
-            t.pickup_loc, t.dropoff_loc,
-            t.estimated_dist, t.actual_dist
-            from Trip t
-            join AppUser p on t.passenger_id = p.user_id
-            join AppUser d on t.passenger_id = d.user_id
+                t.trip_id,
+                t.passenger_id, p.name passenger_name,
+                t.driver_id, d.name driver_name,
+                t.start_time, t.end_time,
+                t.pickup_loc, t.dropoff_loc,
+                t.estimated_dist, t.actual_dist
+            from trip t
+            join appuser p on t.passenger_id = p.user_id
+            left join appuser d on t.driver_id = d.user_id
             where t.trip_id = $1
         """
-        rideDetails = await conn.fetchrow(query, id)
-        if not rideDetails:
-            return {"Error": "Ride does not exist"}
-        return rideDetails
+        row = await conn.fetchrow(query, id)
+        if not row:
+            raise HTTPException(status_code=404, detail="ride not found")
 
+        p_loc = row["pickup_loc"]
+        d_loc = row["dropoff_loc"]
+
+        return {
+                "tripId": row["trip_id"],
+                "passenger": {"id": row["passenger_id"], "name": row["passenger_name"]},
+                "driver": {"id": row["driver_id"], "name": row["driver_name"]} if row["driver_id"] else None,
+                "times": {"start": str(row["start_time"]), "end": str(row["end_time"]) if row["end_time"] else None},
+                "location": {"pickup": {"x": p_loc.x, "y": p_loc.y}, "dropoff": {"x": d_loc.x, "y": d_loc.y}},
+                "distance": {"estimated": float(row["estimated_dist"]), "actual": float(row["actual_dist"]) if row["actual_dist"] else None}
+                }
 
 
 # Tickets
 @router.get("/tickets")
-async def viewAllTickets(sessionKey: str, searchStr: str | None = None, filters: dict | None = None, db = Depends(get_db)):
+async def viewAllTickets( sessionKey: str,  searchStr: Optional[str] = None,  status: Optional[str] = None,  db = Depends(get_db) ):
+    if sessionKey not in sessions:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
     async with db.acquire() as conn:
-        # Not implementing filtering yet
-
-        # Base query
-        query = """
-            SELECT
-            FROM Ticket ti
-            LEFT JOIN Trip tr ON ti.trip_id = tr.trip_id
-            LEFT JOIN Staff s ON ti.staff_id = s.staff_id
-            WHERE 1=1
-        """
-
+        query = "select * from ticket where 1=1"
         params = []
         counter = 1
 
-        # Search
         if searchStr:
-            query += f" and (tr.trip_id::text ILIKE ${counter} or s.staff_id::text ILIKE ${counter})"
+            query += f" and (content ilike ${counter} or ticket_id::text ilike ${counter})"
             params.append(f"%{searchStr}%")
             counter += 1
 
-        ## Filter
-        #if filters:
-        #    for key, value in filters.items():
-        #        # Safety check: Ensure the key is a valid column to prevent injection
-        #        if key in ["status", "passenger_id", "driver_id"]:
-        #            query += f" AND t.{key} = ${counter}"
-        #            params.append(value)
-        #            counter += 1
+        if status:
+            query += f" and status = ${counter}"
+            params.append(status)
+            counter += 1
 
-        query += " ORDER BY ti.inserted_at DESC"
+        query += " order by inserted_at desc"
+        rows = await conn.fetch(query, *params)
 
-        rides = await conn.fetch(query, *params)
-        if not rides:
-            return {"Error": "No matching rides"}
-        return [dict(row) for row in rides]
+        # Return [] if nothing returned, return formatted data otherwise
+        return [{
+            "ticketId": r["ticket_id"],
+            "tripId": r["trip_id"],
+            "staffId": r["staff_id"],
+            "desc": r["content"],
+            "status": r["status"],
+            "date": str(r["inserted_at"])
+            } for r in rows]
 
 
 @router.get("/tickets/{id}")
 async def viewTicketDetails(sessionKey: str, id: int, db = Depends(get_db)):
+    if sessionKey not in sessions:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
     async with db.acquire() as conn:
         query = """
-            select *
-            from Ticket t
-            where t.ticket_id = $1
+            select 
+            ticket_id, trip_id, staff_id, content, timestamp, status, is_deleted
+            from ticket where ticket_id = $1
         """
-        ticketDetails = await conn.fetchrow(query, id)
-        if not ticketDetails:
-            return {"Error": "Ticket does not exist"}
-        return ticketDetails
+        row = await conn.fetchrow(query, id)
+        if not row:
+            raise HTTPException(status_code=404, detail="ticket not found")
 
+        ticket = dict(row)
+        ticket["inserted_at"] = str(ticket["inserted_at"])
+        return ticket
 
 @router.patch("/tickets/{id}/resolve")
 async def resolveTicket(sessionKey: str, id: int):
@@ -145,140 +179,133 @@ async def editTicketDetails(sessionKey: str, id: int, updates: dict):
     return {"ticketId": id, "updates": updates}
 
 
-# Passengers
-@router.get("/passengers")
-async def viewAllPassengers(sessionKey: str, searchStr: str | None = None, filters: dict | None = None, db = Depends(get_db)):
-    async with db.acquire() as conn:
-        # Not implementing filtering yet
-
-        # Base query
-        query = """
-            select p.passenger_id, u.name, p.cnic, p.phone_no
-            from Passenger p
-            join AppUser u on p.passenger_id = u.user_id
-        """
-
-        params = []
-        counter = 1
-
-        # Search
-        if searchStr:
-            query += f"and (p.passenger_id::text ILIKE ${counter} or u.name ILIKE ${counter} or p.cnic ILIKE ${counter} or p.phone_no ILIKE ${counter})"
-            params.append(f"%{searchStr}%")
-            counter += 1
-
-        ## Filter
-        #if filters:
-        #    for key, value in filters.items():
-        #        # Safety check: Ensure the key is a valid column to prevent injection
-        #        if key in ["status", "passenger_id", "driver_id"]:
-        #            query += f" AND t.{key} = ${counter}"
-        #            params.append(value)
-        #            counter += 1
-
-        query += " ORDER BY p.inserted_at DESC"
-
-        passengers = await conn.fetch(query, *params)
-        if not passengers:
-            return {"Error": "No passengers"}
-        return [dict(row) for row in passengers]
-
-
-@router.get("/passengers/{id}")
-async def viewPassengerDetails(sessionKey: str, id: int, db = Depends(get_db)):
-    async with db.acquire() as conn:
-        query = """
-            select p.passenger_id, u.name, p.cnic, p.phone_no
-            from Passenger p
-            join AppUser u on p.passenger_id = u.user_id
-            where p.passenger_id = $1
-        """
-        passengerDetails = await conn.fetchrow(query, id)
-        if not passengerDetails:
-            return {"Error": "Passenger does not exist"}
-        return passengerDetails
-
-
-# Drivers
-@router.get("/drivers/")
-async def viewAllDrivers(sessionKey: str, searchStr: str | None = None, filters: dict | None = None, db = Depends(get_db)):
-    async with db.acquire() as conn:
-        # Not implementing filtering yet
-
-        # Base query
-        query = """
-            select d.driver_id, u.name, d.cnic, d.phone_no
-            from Driver d
-            join AppUser u on d.driver_id = u.user_id
-        """
-
-        params = []
-        counter = 1
-
-        # Search
-        if searchStr:
-            query += f"and (d.driver_id::text ILIKE ${counter} or u.name ILIKE ${counter} or d.cnic ILIKE ${counter} or d.phone_no ILIKE ${counter})"
-            params.append(f"%{searchStr}%")
-            counter += 1
-
-        ## Filter
-        #if filters:
-        #    for key, value in filters.items():
-        #        # Safety check: Ensure the key is a valid column to prevent injection
-        #        if key in ["status", "passenger_id", "driver_id"]:
-        #            query += f" AND t.{key} = ${counter}"
-        #            params.append(value)
-        #            counter += 1
-
-        query += " ORDER BY d.inserted_at DESC"
-
-        drivers = await conn.fetch(query, *params)
-        if not drivers:
-            return {"Error": "No drivers"}
-        return [dict(row) for row in drivers]
-
-
-@router.get("/drivers/{id}")
-async def viewDriverDetails(sessionKey: str, id: int, db = Depends(get_db)):
-    async with db.acquire() as conn:
-        query = """
-            select d.driver_id, u.name, d.cnic, d.phone_no,
-            v.make, v.model, v.engine_no, v.chassis_no,
-            v.plate_no, v.owner_name, v.owner_cnic
-            from Driver d
-            join AppUser u on d.driver_id = u.user_id
-            join Vehicle v on d.driver_id = v.driver_id
-            where d.driver_id = $1
-        """
-        driverDetails = await conn.fetchrow(query, id)
-        if not driverDetails:
-            return {"Error": "Driver does not exist"}
-        return driverDetails
-
-
 # Call
-@router.post("/passengers/call")
+@router.get("/passengers/call")
 async def staffCallPassenger(sessionKey: str, id: int, db = Depends(get_db)):
+    if sessionKey not in sessions:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
     async with db.acquire() as conn:
         query = """
             select p.phone_no
             from Passenger p
             where p.passenger_id = $1
         """
-        passengerPhoneNo = await conn.fetchval(query, id)
-        if not passengerPhoneNo:
-            return {"Error": "Passenger does not exist or phone number not registered"}
-        return passengerPhoneNo
+        val = await conn.fetchval(query, id)
+        if not val:
+            raise HTTPException(status_code=404, detail="passenger not found")
+        return {"phoneNo": val}
 
-@router.post("/drivers/call")
-async def staffCallDriver(sessionKey: str, details: dict, db = Depends(get_db)):
+@router.get("/drivers/call")
+async def staffCallDriver(sessionKey: str, id: int, db = Depends(get_db)):
+    if sessionKey not in sessions:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
     async with db.acquire() as conn:
         query = """
             select d.phone_no
-            from Passenger d
+            from driver d
             where d.driver_id = $1
         """
-        driverPhoneNo = await conn.fetchval(query, id)
-        if not driverPhoneNo:
-            return {"Error": "Driver does not exist or phone number not registered"}
-        return driverPhoneNo
+        val = await conn.fetchval(query, id)
+        if not val:
+            raise HTTPException(status_code=404, detail="driver not found")
+        return {"phoneNo": val}
+
+
+# Passengers
+@router.get("/passengers")
+async def viewAllPassengers(sessionKey: str, searchStr: Optional[str] = None, db = Depends(get_db)):
+    if sessionKey not in sessions:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    async with db.acquire() as conn:
+        query = """
+            select p.passenger_id, u.name, p.cnic, p.phone_no, p.inserted_at
+            from passenger p
+            join appuser u on p.passenger_id = u.user_id
+            where 1=1
+        """
+        params = []
+        if searchStr:
+            query += " and (u.name ilike $1 or p.cnic ilike $1 or p.phone_no ilike $1)"
+            params.append(f"%{searchStr}%")
+
+        query += " order by p.inserted_at desc"
+        rows = await conn.fetch(query, *params)
+
+        return [{
+            "passengerId": r["passenger_id"],
+            "name": r["name"],
+            "cnic": r["cnic"],
+            "phone": r["phone_no"],
+            "joined": str(r["inserted_at"])
+            } for r in rows]
+
+
+
+@router.get("/passengers/{id}")
+async def viewPassengerDetails(sessionKey: str, id: int, db = Depends(get_db)):
+    if sessionKey not in sessions:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    async with db.acquire() as conn:
+        query = """
+            select p.passenger_id, u.name, p.cnic, p.phone_no
+            from passenger p
+            join appuser u on p.passenger_id = u.user_id
+            where p.passenger_id = $1
+        """
+        row = await conn.fetchrow(query, id)
+        if not row:
+            raise HTTPException(status_code=404, detail="passenger not found")
+        return dict(row)
+
+
+# Drivers
+@router.get("/drivers")
+async def viewAllDrivers(sessionKey: str, searchStr: Optional[str] = None, db = Depends(get_db)):
+    if sessionKey not in sessions:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    async with db.acquire() as conn:
+        query = """
+            select d.driver_id, u.name, d.cnic, d.phone_no, d.inserted_at
+            from driver d
+            join appuser u on d.driver_id = u.user_id
+            where 1=1
+        """
+        params = []
+        if searchStr:
+            query += " and (u.name ilike $1 or d.cnic ilike $1 or d.phone_no ilike $1)"
+            params.append(f"%{searchStr}%")
+
+        query += " order by d.inserted_at desc"
+        rows = await conn.fetch(query, *params)
+
+        return [{
+            "driverId": r["driver_id"],
+            "name": r["name"],
+            "phone": r["phone_no"],
+            "joined": str(r["inserted_at"])
+            } for r in rows]
+
+
+@router.get("/drivers/{id}")
+async def viewDriverDetails(sessionKey: str, id: int, db = Depends(get_db)):
+    if sessionKey not in sessions:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    async with db.acquire() as conn:
+        query = """
+            select d.driver_id, u.name, d.cnic, d.phone_no,
+                   v.make, v.model, v.plate_no, v.engine_no, v.chassis_no
+            from driver d
+            join appuser u on d.driver_id = u.user_id
+            left join vehicle v on d.driver_id = v.driver_id
+            where d.driver_id = $1
+        """
+        row = await conn.fetchrow(query, id)
+        if not row:
+            raise HTTPException(status_code=404, detail="driver not found")
+        return dict(row)

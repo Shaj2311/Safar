@@ -43,7 +43,6 @@ async def viewDriverRatings(sessionKey: str, userId: int, db = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid session")
 
     async with db.acquire() as conn:
-        # Basic query to get all ratings for this driver
         query = """
             select r.score, r.feedback, r.inserted_at rated_at
             from Rating r
