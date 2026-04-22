@@ -1,4 +1,4 @@
-from backend.schemas import Message
+from schemas import Message
 from fastapi import APIRouter
 
 router = APIRouter(tags=["Communications & Tracking"])

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from backend.dependencies import get_db
+from dependencies import get_db
 
 router = APIRouter(prefix="/staff", tags=["Staff"])
 

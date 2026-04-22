@@ -1,4 +1,5 @@
 services:
+
   database:
     build:
       context: ./db
@@ -9,5 +10,18 @@ services:
       - ./db/.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  backend:
+      build:
+        context: .
+        dockerfile: ./backend/Dockerfile
+      container_name: safar_backend
+      ports:
+        - "8000:8000"
+      depends_on:
+        - database
+      env_file:
+        - ./db/.env
+
 volumes:
   postgres_data:
