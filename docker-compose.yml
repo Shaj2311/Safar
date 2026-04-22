@@ -12,16 +12,18 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
-      build:
-        context: .
-        dockerfile: ./backend/Dockerfile
-      container_name: safar_backend
-      ports:
-        - "8000:8000"
-      depends_on:
-        - database
-      env_file:
-        - ./db/.env
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: safar_backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database
+    env_file:
+      - ./db/.env
+    volumes:
+      - ./backend:/app
 
 volumes:
   postgres_data:
