@@ -7,15 +7,14 @@ async def resolveEscalatedTicket(sessionKey: str, id: int):
     return {"ticketId": id, "status": "Escalated issue resolved by Admin"}
 
 
-@router.get("/accounts/{role}/{id}")
-async def adminViewAccount(sessionKey: str, role: str, id: int):
-    return {"role": role, "id": id, "data": "Confidential Profile Data"}
+@router.delete("/passengers/{id}")
+async def deletePassenger(sessionKey: str, id: int):
+    return {"status": "Account deleted", "targetId": id}
 
 
-@router.delete("/accounts/{role}/{id}")
-async def adminDeleteAccount(sessionKey: str, role: str, id: int):
-    """Delete passenger or driver accounts"""
-    return {"status": f"{role} account deleted", "targetId": id}
+@router.delete("/drivers/{id}")
+async def deleteDriver(sessionKey: str, id: int):
+    return {"status": "Account deleted", "targetId": id}
 
 
 @router.post("/drivers")

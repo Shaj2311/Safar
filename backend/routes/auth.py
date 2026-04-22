@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from backend.schemas import User
+from schemas import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

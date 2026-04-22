@@ -1,4 +1,4 @@
-from backend.schemas import Ticket
+from schemas import Ticket
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/support", tags=["Support Staff"])
