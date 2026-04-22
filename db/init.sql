@@ -167,6 +167,20 @@ CREATE TABLE LocationHistory (
 );
 
 
+CREATE TABLE Rating (
+  rating_id bigint generated always as identity,
+  trip_id bigint,
+  score int CHECK (score >= 1 AND score <= 5),
+  feedback text,
+  is_deleted boolean not null default false,
+  inserted_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  PRIMARY KEY (rating_id),
+  CONSTRAINT FK_Rating_trip_id
+    FOREIGN KEY (trip_id)
+      REFERENCES Trip(trip_id)
+);
+
 
 -- -- Insert Drivers
 -- WITH new_user AS (
@@ -296,3 +310,7 @@ INSERT INTO LocationHistory (trip_id, location, timestamp, is_deleted, inserted_
 (1, point(24.89, 67.05), now() - interval '40 minutes', false, now(), now()),
 (2, point(31.52, 74.35), now() - interval '110 minutes', false, now(), now()),
 (2, point(31.48, 74.28), now() - interval '100 minutes', false, now(), now());
+
+INSERT INTO Rating (trip_id, score, feedback, is_deleted, inserted_at, updated_at) VALUES 
+(1, 5, 'Excellent ride! John was very professional and the car was spotless.', false, now(), now()),
+(2, 4, 'Jane was great, but the traffic was a bit rough. Very smooth driving though.', false, now(), now());
