@@ -1,9 +1,9 @@
 from fastapi import FastAPI
-import asyncpg
+import asyncpg, asyncio
 from dotenv import load_dotenv
 import os
-from backend.routes import auth, users, rides, drivers, history, comms
-from backend.routes.staff import admin, superAdmin, support, staff
+from routes import auth, users, rides, drivers, history, comms
+from routes.staff import admin, superAdmin, support, staff
 
 # Load DB environment variables
 load_dotenv("db/.env")
@@ -27,12 +27,21 @@ app.include_router(staff.router)
 # Connect to DB at startup
 @app.on_event("startup")
 async def startup():
-    app.state.db = await asyncpg.create_pool(
-            user=os.getenv("POSTGRES_USER"),
-            password=os.getenv("POSTGRES_PASSWORD"),
-            database=os.getenv("POSTGRES_DB"),
-            host="localhost"
-            )
+    # Polling loop in case database docker is not ready
+    while True:
+        try:
+            app.state.db = await asyncpg.create_pool(
+                    user=os.getenv("POSTGRES_USER"),
+                    password=os.getenv("POSTGRES_PASSWORD"),
+                    database=os.getenv("POSTGRES_DB"),
+                    host=os.getenv("DATABASE_HOST"),
+                    port=int(os.getenv("DATABASE_PORT", 5432))
+                    )
+            print("DB connected")
+            break
+        except Exception as e:
+            print("DB not ready, retrying...", e)
+            await asyncio.sleep(2)
 
 
 # Disconnect from DB at shutdown
