@@ -52,6 +52,24 @@ class RatingData(BaseModel):
     score: int
     feedback: Optional[str] = None
 
+class PassengerUpdate(BaseModel):
+    name: Optional[str] = None
+    cnic: Optional[str] = None
+    phone: Optional[str] = None
+
+class DriverUpdate(BaseModel):
+    name: Optional[str] = None
+    phone_no: Optional[str] = None
+
+class VehicleUpdate(BaseModel):
+    make: str
+    model: str
+    engine_no: str
+    chassis_no: str
+    plate_no: Optional[str] = None
+    owner_name: Optional[str] = None
+    owner_cnic: Optional[str] = None
+
 class Ticket(BaseModel):
     ticketId: int
     description: str
