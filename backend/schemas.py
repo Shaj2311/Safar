@@ -70,6 +70,12 @@ class VehicleUpdate(BaseModel):
     owner_name: Optional[str] = None
     owner_cnic: Optional[str] = None
 
+class AdminDriverCreate(BaseModel):
+    name: str
+    password: str
+    cnic: str
+    phone_no: str
+
 class Ticket(BaseModel):
     ticketId: int
     description: str
