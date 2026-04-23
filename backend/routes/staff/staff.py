@@ -12,7 +12,7 @@ async def staffViewRides(sessionKey: str, searchStr: Optional[str] = None, statu
 
     async with db.acquire() as conn:
         query = """
-            select t.trip_id, t.pickup_loc, t.dropoff_loc, t.end_time, t.is_deleted,
+            select t.trip_id, t.pickup_loc, t.dropoff_loc, t.start_time, t.end_time, t.is_deleted,
                    p.actual_fare, u_p.name as passenger_name, u_d.name as driver_name
             from trip t
             left join payment p on t.trip_id = p.trip_id
@@ -56,7 +56,8 @@ async def staffViewRides(sessionKey: str, searchStr: Optional[str] = None, statu
             d_loc = row["dropoff_loc"]
 
             # format data
-            ride_status = "live"
+            ride_status = "pending"
+            if row["start_time"]: ride_status = "in progress"
             if row["end_time"]: ride_status = "completed"
             if row["is_deleted"]: ride_status = "cancelled"
 
