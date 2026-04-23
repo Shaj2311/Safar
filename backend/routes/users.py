@@ -4,6 +4,16 @@ from dependencies import get_db, validate_session
 router = APIRouter(prefix="/users", tags=["User Profiles"])
 
 
+#  _________________________________________
+# /                                         \
+# |  MAKE THESE SPECIFIC INSTEAD OF GENERAL |
+# \                                         /
+#  -----------------------------------------
+#     \   ^__^
+#      \  (oo)\_______
+#         (__)\       )\/\
+#             ||----w |
+#             ||     ||
 @router.patch("/me")
 async def updateProfile(sessionKey: str, updates: dict):
     validate_session(sessionKey)

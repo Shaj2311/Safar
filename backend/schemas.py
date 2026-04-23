@@ -19,17 +19,24 @@ class StaffBase(User):
     cnic: str
 
 class StaffSignup(StaffBase):
-    pass  # Standard support/staff role
+    pass
 
 class AdminSignup(StaffBase):
-    pass  # Admin role
+    pass
 
 class SuperAdminSignup(StaffBase):
-    pass  # Superadmin role
+    pass
 
 class Message(BaseModel):
-    messageId: int
+    receiverId: int
     content: str
+
+class DriverProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    phoneNo: Optional[str] = None
+
+class AcceptRide(BaseModel):
+    tripId: int
 
 class Ticket(BaseModel):
     ticketId: int

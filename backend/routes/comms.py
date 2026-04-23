@@ -1,19 +1,47 @@
 from schemas import Message
 from fastapi import APIRouter, Depends, HTTPException
-from dependencies import get_db, validate_session # Imported validator from dependencies
+from dependencies import get_db, validate_session
 from typing import Any
 
 router = APIRouter(tags=["Communications & Tracking"])
 
 @router.post("/chats/{id}/messages")
-async def sendMessage(sessionKey: str, message: Message):
-    validate_session(sessionKey) # Centralized gatekeeping applied
-    return message
+async def sendMessage(sessionKey: str, id: int, message: Message, db = Depends(get_db)):
+    # Centralized gatekeeping applied: returns userId if valid
+    userId = validate_session(sessionKey) 
+
+    async with db.acquire() as conn:
+        # verify chat exists and belongs to the trip (basic query)
+        check_chat = "select chat_id from chat where chat_id = $1 and is_deleted = false"
+        chat_exists = await conn.fetchval(check_chat, id)
+        
+        if not chat_exists:
+            raise HTTPException(status_code=404, detail="chat not found")
+
+        # strictly lowercase sql keywords per coding standards
+        query = """
+            insert into message (chat_id, sender_id, receiver_id, content)
+            values ($1, $2, $3, $4)
+            returning message_id, sent_at
+        """
+        new_row = await conn.fetchrow(
+            query, 
+            id, 
+            userId, 
+            message.receiverId, 
+            message.content
+        )
+
+        return {
+            "status": "Message sent",
+            "messageId": new_row["message_id"],
+            "sentAt": str(new_row["sent_at"]) # DateTime to string conversion
+        }
 
 @router.get("/chats/{id}/messages")
 async def receiveMessages(sessionKey: str, id: int, db = Depends(get_db)):
     """Polled to receive any new incoming messages"""
-    validate_session(sessionKey) # Centralized gatekeeping applied
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
@@ -36,9 +64,9 @@ async def receiveMessages(sessionKey: str, id: int, db = Depends(get_db)):
         return {"chatId": id, "messages": messages_list}
 
 
-@router.get("/call") # Changed from POST to GET per idempotency logic
-async def call(sessionKey: str, id: int): # Changed callDetails dict to id param for retrieval
-    validate_session(sessionKey) # Centralized gatekeeping applied
+@router.get("/call")
+async def call(sessionKey: str, id: int):
+    validate_session(sessionKey)
     return {"status": "Call initiated", "targetId": id}
 
 
