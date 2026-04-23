@@ -87,9 +87,10 @@ class StaffCreate(BaseModel):
     phone_no: str
     role: Literal['admin', 'support']
 
-class Ticket(BaseModel):
-    ticketId: int
-    description: str
+class TicketCreate(BaseModel):
+    trip_id: int
+    staff_id: int
+    content: str
 
 class Role(str, Enum):
     PASSENGER = "passenger"
