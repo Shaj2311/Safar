@@ -5,6 +5,8 @@ import os
 from routes import auth, users, rides, drivers, history, comms
 from routes.staff import admin, superAdmin, support, staff
 from state import session_sweeper
+# REMOVE ME
+from dev import setup_dev_sessions
 
 # Load DB environment variables
 load_dotenv("db/.env")
@@ -44,6 +46,7 @@ async def startup():
             print("DB not ready, retrying...", e)
             await asyncio.sleep(2)
     asyncio.create_task(session_sweeper())
+    setup_dev_sessions();
 
 
 
