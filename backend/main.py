@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 from routes import auth, users, rides, drivers, history, comms
 from routes.staff import admin, superAdmin, support, staff
+from state import session_sweeper
 
 # Load DB environment variables
 load_dotenv("db/.env")
@@ -42,6 +43,8 @@ async def startup():
         except Exception as e:
             print("DB not ready, retrying...", e)
             await asyncio.sleep(2)
+    asyncio.create_task(session_sweeper())
+
 
 
 # Disconnect from DB at shutdown

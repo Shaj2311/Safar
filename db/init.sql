@@ -41,7 +41,7 @@ CREATE TABLE Trip (
   trip_id bigint generated always as identity,
   passenger_id bigint,
   driver_id bigint,
-  start_time timestamptz not null default now(),
+  start_time timestamptz,
   end_time timestamptz,
   pickup_loc point not null,
   dropoff_loc point not null,

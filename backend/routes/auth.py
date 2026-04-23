@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from dependencies import get_db
-from state import sessions
+from state import sessions, create_session
 from schemas import (
         User, PassengerSignup, DriverSignup, 
         StaffSignup, AdminSignup, SuperAdminSignup
@@ -20,16 +20,18 @@ async def verify_credentials(conn, details: User):
         raise HTTPException(status_code=401, detail="invalid credentials")
     return row["user_id"]
 
-def create_session(user_id: int, role: str):
-    """Generates and stores a user session"""
-    sessionKey = str(uuid.uuid4())
-    sessions[sessionKey] = {
-            "userId": user_id,
-            "role": role,
-            "expiry": time.time() + 3600
-            }
-    print("Session created: ", sessions[sessionKey])
-    return sessionKey
+#def create_session(user_id: int, role: str):
+#    """Generates and stores a user session"""
+#    sessionKey = str(uuid.uuid4())
+#    sessions[sessionKey] = {
+#            "userId": user_id,
+#            "role": role,
+#            "expiry": time.time() + 3600
+#            }
+#    print("Session created: ", sessions[sessionKey])
+#    print("Active sessions: ")
+#    print(sessions)
+#    return sessionKey
 
 
 # Passenger
@@ -51,7 +53,7 @@ async def loginPassenger(details: User, db = Depends(get_db)):
         if not is_passenger:
             raise HTTPException(status_code=403, detail="user is not a passenger")
 
-        s_key = create_session(userId, "passenger")
+        s_key = create_session(userId)
         return {"Status": "Login complete", "sessionKey": s_key, "userId": userId}
 
 
@@ -74,7 +76,7 @@ async def loginDriver(details: User, db = Depends(get_db)):
         if not is_driver:
             raise HTTPException(status_code=403, detail="user is not a driver")
 
-        s_key = create_session(userId, "driver")
+        s_key = create_session(userId)
         return {"Status": "Login complete", "sessionKey": s_key, "userId": userId}
 
 
@@ -117,5 +119,5 @@ async def loginStaff(details: User, db = Depends(get_db)):
             raise HTTPException(status_code=403, detail="user is not a staff member")
 
         role = staff_row["role"]
-        s_key = create_session(userId, role)
+        s_key = create_session(userId)
         return {"Status": "Login complete", "sessionKey": s_key, "userId": userId, "role": role}
