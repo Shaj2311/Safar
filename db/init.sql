@@ -63,7 +63,7 @@ CREATE TABLE Staff (
   staff_id bigint PRIMARY KEY REFERENCES AppUser(user_id) ON DELETE CASCADE,
   cnic varchar,
   phone_no varchar(20) not null,
-  role varchar(20) not null check (role in ('admin', 'support')),
+  role varchar(20) not null check (role in ('admin', 'support', 'super')),
   is_deleted boolean not null default false,
   inserted_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -188,7 +188,8 @@ INSERT INTO AppUser (name, password) VALUES
 ('Alice Passenger', 'alicepass'),
 ('Bob Passenger', 'bobpass'),
 ('Charlie Admin', 'adminpass'),
-('Dana Support', 'supportpass');
+('Dana Support', 'supportpass'),
+('Superman', 'super');
 
 INSERT INTO Driver (driver_id, cnic, phone_no, is_deleted, inserted_at, updated_at) VALUES
 (1, '42101-1234567-1', '+923001112221', false, now(), now()),
@@ -200,7 +201,8 @@ INSERT INTO Passenger (passenger_id, cnic, phone_no, is_deleted, inserted_at, up
 
 INSERT INTO Staff (staff_id, cnic, phone_no, role, is_deleted, inserted_at, updated_at) VALUES
 (5, '42101-9999999-5', '+923005556665', 'admin', false, now(), now()),
-(6, '42101-8888888-6', '+923005556666', 'support', false, now(), now());
+(6, '42101-8888888-6', '+923005556666', 'support', false, now(), now()),
+(7, '42101-8888888-7', '+923005556666', 'super', false, now(), now());
 
 INSERT INTO Vehicle (driver_id, make, model, engine_no, chassis_no, plate_no, owner_name, owner_cnic, is_deleted, inserted_at, updated_at) VALUES
 (1, 'Toyota', 'Corolla', 'ENG-101', 'CHS-101', 'ABC-123', 'John Driver', '42101-1234567-1', false, now(), now()),

@@ -10,7 +10,8 @@ def setup_dev_sessions():
         {"id": 3, "name": "Alice Passenger"},
         {"id": 4, "name": "Bob Passenger"},
         {"id": 5, "name": "Charlie Admin"},
-        {"id": 6, "name": "Dana Support"}
+        {"id": 6, "name": "Dana Support"},
+        {"id": 7, "name": "Superman"}
     ]
 
     print(f"\n--- [DEV MODE] Injecting Hardcoded Sessions ---")
