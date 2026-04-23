@@ -1,10 +1,31 @@
 from enum import Enum
-
 from pydantic import BaseModel
+from typing import Optional
 
 class User(BaseModel):
-    username: str
+    name: str
     password: str
+
+class PassengerSignup(User):
+    phoneNo: str
+    cnic: Optional[str] = None
+
+class DriverSignup(User):
+    phoneNo: str
+    cnic: str
+
+class StaffBase(User):
+    phoneNo: str
+    cnic: str
+
+class StaffSignup(StaffBase):
+    pass  # Standard support/staff role
+
+class AdminSignup(StaffBase):
+    pass  # Admin role
+
+class SuperAdminSignup(StaffBase):
+    pass  # Superadmin role
 
 class Message(BaseModel):
     messageId: int
