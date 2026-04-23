@@ -1,24 +1,24 @@
 from schemas import Message
 from fastapi import APIRouter, Depends, HTTPException
-from state import sessions
-from dependencies import get_db
+from dependencies import get_db, validate_session # Imported validator from dependencies
+from typing import Any
 
 router = APIRouter(tags=["Communications & Tracking"])
 
 @router.post("/chats/{id}/messages")
 async def sendMessage(sessionKey: str, message: Message):
+    validate_session(sessionKey) # Centralized gatekeeping applied
     return message
 
 @router.get("/chats/{id}/messages")
 async def receiveMessages(sessionKey: str, id: int, db = Depends(get_db)):
     """Polled to receive any new incoming messages"""
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey) # Centralized gatekeeping applied
 
     async with db.acquire() as conn:
         query = """
             select sender_id, receiver_id, content, sent_at
-            from Message
+            from message
             where chat_id = $1 and is_deleted = false
             order by sent_at asc
         """
@@ -36,9 +36,10 @@ async def receiveMessages(sessionKey: str, id: int, db = Depends(get_db)):
         return {"chatId": id, "messages": messages_list}
 
 
-@router.post("/call")
-async def call(sessionKey: str, callDetails: dict):
-    return {"status": "Call initiated", "details": callDetails}
+@router.get("/call") # Changed from POST to GET per idempotency logic
+async def call(sessionKey: str, id: int): # Changed callDetails dict to id param for retrieval
+    validate_session(sessionKey) # Centralized gatekeeping applied
+    return {"status": "Call initiated", "targetId": id}
 
 
 @router.get("/public/track/{encryptedRideId}")
@@ -53,8 +54,8 @@ async def getPublicRideDetails(encryptedRideId: str, db = Depends(get_db)):
     async with db.acquire() as conn:
         query = """
             select t.is_deleted, lh.location, t.end_time
-            from Trip t
-            left join LocationHistory lh on t.trip_id = lh.trip_id
+            from trip t
+            left join locationhistory lh on t.trip_id = lh.trip_id
             where t.trip_id = $1
             order by lh.timestamp desc
             limit 1

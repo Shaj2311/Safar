@@ -1,19 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
-from dependencies import get_db
-from state import sessions
+from dependencies import get_db, validate_session
 
 router = APIRouter(prefix="/history", tags=["Trip History"])
+
 @router.get("/summary")
 async def viewEarnings(sessionKey: str, driverId: int, db = Depends(get_db)):
     # Return exception if not logged in, or trying to view earnings of some other user
-    if sessionKey not in sessions or sessions[sessionKey] != driverId:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    sessionUserId = validate_session(sessionKey)
+    if sessionUserId != driverId:
+        raise HTTPException(status_code=403, detail="forbidden")
 
     async with db.acquire() as conn:
         query = """
             select p.trip_id, p.actual_fare
-            from Payment p
-            join Trip t on p.trip_id = t.trip_id
+            from payment p
+            join trip t on p.trip_id = t.trip_id
             where t.driver_id = $1
             and p.is_paid = true
             and p.is_deleted = false
@@ -45,8 +46,9 @@ async def viewEarnings(sessionKey: str, driverId: int, db = Depends(get_db)):
 
 @router.get("/rides")
 async def getPastTrips(sessionKey: str, driverId: int, db = Depends(get_db)):
-    if sessionKey not in sessions or sessions[sessionKey] != driverId:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    sessionUserId = validate_session(sessionKey)
+    if sessionUserId != driverId:
+        raise HTTPException(status_code=403, detail="forbidden")
 
     async with db.acquire() as conn:
         query = """
@@ -75,8 +77,7 @@ async def getPastTrips(sessionKey: str, driverId: int, db = Depends(get_db)):
 
 @router.get("/rides/{id}")
 async def getPastTripDetails(sessionKey: str, id: int, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """

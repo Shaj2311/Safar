@@ -1,23 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException
-from dependencies import get_db
+from dependencies import get_db, validate_session
 from state import sessions
 
 router = APIRouter(prefix="/drivers", tags=["Drivers"])
 
 @router.get("/me")
 async def getDriverProfile(sessionKey: str, id: int, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    sessionUserId = validate_session(sessionKey)
 
     # check if the session belongs to the id requested
-    if sessions[sessionKey] != id:
+    if sessionUserId != id:
         raise HTTPException(status_code=403, detail="forbidden")
 
     async with db.acquire() as conn:
         query = """
             select d.driver_id, u.name, d.cnic, d.phone_no
-            from Driver d
-            join AppUser u on d.driver_id = u.user_id
+            from driver d
+            join appuser u on d.driver_id = u.user_id
             where d.driver_id = $1 and d.is_deleted = false
         """
         profile = await conn.fetchrow(query, id)
@@ -34,13 +33,12 @@ async def getDriverProfile(sessionKey: str, id: int, db = Depends(get_db)):
 
 @router.get("/incomingRequests")
 async def checkIncomingRequests(sessionKey: str, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
             select trip_id, passenger_id, pickup_loc, dropoff_loc, estimated_dist
-            from Trip
+            from trip
             where driver_id is null and is_deleted = false
         """
         rows = await conn.fetch(query)
@@ -60,15 +58,15 @@ async def checkIncomingRequests(sessionKey: str, db = Depends(get_db)):
                 })
         return requests
 
+
 @router.get("/incomingRequests/{id}")
 async def getRideRequestDetails(sessionKey: str, id: int, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
             select trip_id, passenger_id, pickup_loc, dropoff_loc, estimated_dist, inserted_at
-            from Trip
+            from trip
             where trip_id = $1 and driver_id is null
         """
         row = await conn.fetchrow(query, id)
