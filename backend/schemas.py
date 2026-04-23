@@ -38,6 +38,20 @@ class DriverProfileUpdate(BaseModel):
 class AcceptRide(BaseModel):
     tripId: int
 
+class RideRequest(BaseModel):
+    pickup_x: float
+    pickup_y: float
+    dropoff_x: float
+    dropoff_y: float
+
+class GPSData(BaseModel):
+    x: float
+    y: float
+
+class RatingData(BaseModel):
+    score: int
+    feedback: Optional[str] = None
+
 class Ticket(BaseModel):
     ticketId: int
     description: str
