@@ -1,52 +1,48 @@
 from fastapi import APIRouter, Depends, HTTPException
-from dependencies import get_db
-from state import sessions
+from dependencies import get_db, validate_session
 
 router = APIRouter(prefix="/users", tags=["User Profiles"])
 
 
 @router.patch("/me")
 async def updateProfile(sessionKey: str, updates: dict):
+    validate_session(sessionKey)
     return {"message": "Profile updated", "appliedUpdates": updates}
 
 @router.patch("/me/vehicle")
 async def updateVehicle(sessionKey: str, vehicleData: dict):
+    validate_session(sessionKey)
     return {"message": "Vehicle details updated", "vehicle": vehicleData}
 
-# async def viewDriverProfile(sessionKey: str, userId: int):
-#     """Called by passenger to view driver"""
-#     return {"driverId": userId}
 @router.get("/{userId}/profile")
 async def viewDriverProfile(sessionKey: str, userId: int, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="Unauthorized: Invalid session")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
-            SELECT u.name, d.phone_no, v.make, v.model, v.plate_no,
-               (SELECT COUNT(*) FROM Trip WHERE driver_id = $1) AS total_trips
-            FROM AppUser u
-            JOIN Driver d ON u.user_id = d.driver_id
-            LEFT JOIN Vehicle v ON d.driver_id = v.driver_id
-            WHERE u.user_id = $1 AND d.is_deleted = false
+            select u.name, d.phone_no, v.make, v.model, v.plate_no,
+               (select count(*) from trip where driver_id = $1) as total_trips
+            from appuser u
+            join driver d on u.user_id = d.driver_id
+            left join vehicle v on d.driver_id = v.driver_id
+            where u.user_id = $1 and d.is_deleted = false
         """
         profile = await conn.fetchrow(query, userId)
         if not profile:
-            raise HTTPException(status_code=404, detail="Driver not found")
+            raise HTTPException(status_code=404, detail="driver not found")
         return dict(profile)
 
 
 @router.get("/{userId}/ratings")
 async def viewDriverRatings(sessionKey: str, userId: int, db = Depends(get_db)):
     """Called by passenger to view driver ratings"""
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="Unauthorized: Invalid session")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
             select r.score, r.feedback, r.inserted_at rated_at
-            from Rating r
-            join Trip t on r.trip_id = t.trip_id
+            from rating r
+            join trip t on r.trip_id = t.trip_id
             where t.driver_id = $1 and r.is_deleted = false
         """
         rows = await conn.fetch(query, userId)

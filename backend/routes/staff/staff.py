@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from dependencies import get_db
-from state import sessions
+from dependencies import get_db, validate_session
 from typing import Optional
 
 router = APIRouter(prefix="/staff", tags=["Staff"])
@@ -9,8 +8,7 @@ router = APIRouter(prefix="/staff", tags=["Staff"])
 
 @router.get("/rides")
 async def staffViewRides(sessionKey: str, searchStr: Optional[str] = None, status: Optional[str] = None, minFare: Optional[float] = None, maxFare: Optional[float] = None,db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
@@ -67,8 +65,8 @@ async def staffViewRides(sessionKey: str, searchStr: Optional[str] = None, statu
                 "passenger": row["passenger_name"],
                 "driver": row["driver_name"],
                 "status": ride_status,
-                "pickup": {"x": p_loc.x, "y": p_loc.y},
-                "dropoff": {"x": d_loc.x, "y": d_loc.y},
+                "pickup": {"x": p_loc.x, "y": p_loc.y} if p_loc else None,
+                "dropoff": {"x": d_loc.x, "y": d_loc.y} if d_loc else None,
                 "fare": float(row["actual_fare"]) if row["actual_fare"] else 0.0
                 })
         return results
@@ -76,8 +74,7 @@ async def staffViewRides(sessionKey: str, searchStr: Optional[str] = None, statu
 
 @router.get("/rides/{id}")
 async def staffViewRideDetails(sessionKey: str, id: int, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
@@ -105,16 +102,21 @@ async def staffViewRideDetails(sessionKey: str, id: int, db = Depends(get_db)):
                 "passenger": {"id": row["passenger_id"], "name": row["passenger_name"]},
                 "driver": {"id": row["driver_id"], "name": row["driver_name"]} if row["driver_id"] else None,
                 "times": {"start": str(row["start_time"]), "end": str(row["end_time"]) if row["end_time"] else None},
-                "location": {"pickup": {"x": p_loc.x, "y": p_loc.y}, "dropoff": {"x": d_loc.x, "y": d_loc.y}},
-                "distance": {"estimated": float(row["estimated_dist"]), "actual": float(row["actual_dist"]) if row["actual_dist"] else None}
+                "location": {
+                    "pickup": {"x": p_loc.x, "y": p_loc.y} if p_loc else None, 
+                    "dropoff": {"x": d_loc.x, "y": d_loc.y} if d_loc else None
+                },
+                "distance": {
+                    "estimated": float(row["estimated_dist"]) if row["estimated_dist"] else 0.0, 
+                    "actual": float(row["actual_dist"]) if row["actual_dist"] else None
+                }
                 }
 
 
 # Tickets
 @router.get("/tickets")
 async def viewAllTickets( sessionKey: str,  searchStr: Optional[str] = None,  status: Optional[str] = None,  db = Depends(get_db) ):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = "select * from ticket where 1=1"
@@ -134,7 +136,6 @@ async def viewAllTickets( sessionKey: str,  searchStr: Optional[str] = None,  st
         query += " order by inserted_at desc"
         rows = await conn.fetch(query, *params)
 
-        # Return [] if nothing returned, return formatted data otherwise
         return [{
             "ticketId": r["ticket_id"],
             "tripId": r["trip_id"],
@@ -147,13 +148,12 @@ async def viewAllTickets( sessionKey: str,  searchStr: Optional[str] = None,  st
 
 @router.get("/tickets/{id}")
 async def viewTicketDetails(sessionKey: str, id: int, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
             select 
-            ticket_id, trip_id, staff_id, content, timestamp, status, is_deleted
+            ticket_id, trip_id, staff_id, content, inserted_at, status, is_deleted
             from ticket where ticket_id = $1
         """
         row = await conn.fetchrow(query, id)
@@ -166,29 +166,31 @@ async def viewTicketDetails(sessionKey: str, id: int, db = Depends(get_db)):
 
 @router.patch("/tickets/{id}/resolve")
 async def resolveTicket(sessionKey: str, id: int):
+    validate_session(sessionKey)
     return {"ticketId": id, "status": "Resolved"}
 
 
 @router.delete("/tickets/{id}")
 async def deleteTicket(sessionKey: str, id: int):
+    validate_session(sessionKey)
     return {"id": id, "status": "deleted"}
 
 
 @router.patch("/tickets/{id}")
 async def editTicketDetails(sessionKey: str, id: int, updates: dict):
+    validate_session(sessionKey)
     return {"ticketId": id, "updates": updates}
 
 
 # Call
 @router.get("/passengers/call")
 async def staffCallPassenger(sessionKey: str, id: int, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
             select p.phone_no
-            from Passenger p
+            from passenger p
             where p.passenger_id = $1
         """
         val = await conn.fetchval(query, id)
@@ -198,8 +200,7 @@ async def staffCallPassenger(sessionKey: str, id: int, db = Depends(get_db)):
 
 @router.get("/drivers/call")
 async def staffCallDriver(sessionKey: str, id: int, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
@@ -216,8 +217,7 @@ async def staffCallDriver(sessionKey: str, id: int, db = Depends(get_db)):
 # Passengers
 @router.get("/passengers")
 async def viewAllPassengers(sessionKey: str, searchStr: Optional[str] = None, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
@@ -246,8 +246,7 @@ async def viewAllPassengers(sessionKey: str, searchStr: Optional[str] = None, db
 
 @router.get("/passengers/{id}")
 async def viewPassengerDetails(sessionKey: str, id: int, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
@@ -265,8 +264,7 @@ async def viewPassengerDetails(sessionKey: str, id: int, db = Depends(get_db)):
 # Drivers
 @router.get("/drivers")
 async def viewAllDrivers(sessionKey: str, searchStr: Optional[str] = None, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
@@ -293,8 +291,7 @@ async def viewAllDrivers(sessionKey: str, searchStr: Optional[str] = None, db = 
 
 @router.get("/drivers/{id}")
 async def viewDriverDetails(sessionKey: str, id: int, db = Depends(get_db)):
-    if sessionKey not in sessions:
-        raise HTTPException(status_code=401, detail="unauthorized")
+    validate_session(sessionKey)
 
     async with db.acquire() as conn:
         query = """
