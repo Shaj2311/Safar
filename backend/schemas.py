@@ -1,6 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Literal
 
 class User(BaseModel):
     name: str
@@ -75,6 +75,10 @@ class AdminDriverCreate(BaseModel):
     password: str
     cnic: str
     phone_no: str
+
+class TicketUpdate(BaseModel):
+    content: Optional[str] = None
+    status: Optional[Literal['open', 'resolved', 'escalated']] = None
 
 class Ticket(BaseModel):
     ticketId: int

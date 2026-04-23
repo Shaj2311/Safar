@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from dependencies import get_db, validate_session
 from typing import Optional
+from schemas import TicketUpdate
 
 router = APIRouter(prefix="/staff", tags=["Staff"])
 
@@ -13,12 +14,12 @@ async def staffViewRides(sessionKey: str, searchStr: Optional[str] = None, statu
     async with db.acquire() as conn:
         query = """
             select t.trip_id, t.pickup_loc, t.dropoff_loc, t.start_time, t.end_time, t.is_deleted,
-                   p.actual_fare, u_p.name as passenger_name, u_d.name as driver_name
+                    p.actual_fare, u_p.name as passenger_name, u_d.name as driver_name
             from trip t
             left join payment p on t.trip_id = p.trip_id
             left join appuser u_p on t.passenger_id = u_p.user_id
             left join appuser u_d on t.driver_id = u_d.user_id
-            where 1=1
+            where t.is_deleted = false
         """
         params = []
         counter = 1
@@ -89,7 +90,7 @@ async def staffViewRideDetails(sessionKey: str, id: int, db = Depends(get_db)):
             from trip t
             join appuser p on t.passenger_id = p.user_id
             left join appuser d on t.driver_id = d.user_id
-            where t.trip_id = $1
+            where t.trip_id = $1 and t.is_deleted = false
         """
         row = await conn.fetchrow(query, id)
         if not row:
@@ -106,11 +107,11 @@ async def staffViewRideDetails(sessionKey: str, id: int, db = Depends(get_db)):
                 "location": {
                     "pickup": {"x": p_loc.x, "y": p_loc.y} if p_loc else None, 
                     "dropoff": {"x": d_loc.x, "y": d_loc.y} if d_loc else None
-                },
+                    },
                 "distance": {
                     "estimated": float(row["estimated_dist"]) if row["estimated_dist"] else 0.0, 
                     "actual": float(row["actual_dist"]) if row["actual_dist"] else None
-                }
+                    }
                 }
 
 
@@ -120,7 +121,7 @@ async def viewAllTickets( sessionKey: str,  searchStr: Optional[str] = None,  st
     validate_session(sessionKey)
 
     async with db.acquire() as conn:
-        query = "select * from ticket where 1=1"
+        query = "select * from ticket where is_deleted = false"
         params = []
         counter = 1
 
@@ -155,7 +156,7 @@ async def viewTicketDetails(sessionKey: str, id: int, db = Depends(get_db)):
         query = """
             select 
             ticket_id, trip_id, staff_id, content, inserted_at, status, is_deleted
-            from ticket where ticket_id = $1
+            from ticket where ticket_id = $1 and is_deleted = false
         """
         row = await conn.fetchrow(query, id)
         if not row:
@@ -166,21 +167,56 @@ async def viewTicketDetails(sessionKey: str, id: int, db = Depends(get_db)):
         return ticket
 
 @router.patch("/tickets/{id}/resolve")
-async def resolveTicket(sessionKey: str, id: int):
+async def resolveTicket(sessionKey: str, id: int, db = Depends(get_db)):
     validate_session(sessionKey)
-    return {"ticketId": id, "status": "Resolved"}
+
+    async with db.acquire() as conn:
+        result = await conn.execute(
+                "update ticket set status = 'resolved', updated_at = now() where ticket_id = $1 and is_deleted = false", 
+                id
+                )
+        if result == "UPDATE 0":
+            raise HTTPException(status_code=404, detail="ticket not found")
+        return {"ticketId": id, "status": "Resolved"}
 
 
 @router.delete("/tickets/{id}")
-async def deleteTicket(sessionKey: str, id: int):
+async def deleteTicket(sessionKey: str, id: int, db = Depends(get_db)):
     validate_session(sessionKey)
-    return {"id": id, "status": "deleted"}
+
+    async with db.acquire() as conn:
+        result = await conn.execute(
+                "update ticket set is_deleted = true, updated_at = now() where ticket_id = $1", 
+                id
+                )
+        if result == "UPDATE 0":
+            raise HTTPException(status_code=404, detail="ticket not found")
+        return {"id": id, "status": "deleted"}
 
 
 @router.patch("/tickets/{id}")
-async def editTicketDetails(sessionKey: str, id: int, updates: dict):
+async def editTicketDetails(sessionKey: str, id: int, updates: TicketUpdate, db = Depends(get_db)):
+    """Modified to use TicketUpdate schema for validation"""
     validate_session(sessionKey)
-    return {"ticketId": id, "updates": updates}
+
+    async with db.acquire() as conn:
+        # Use coalesce for partial updates
+        query = """
+            update ticket 
+            set content = coalesce($1, content),
+                status = coalesce($2, status),
+                updated_at = now()
+            where ticket_id = $3 and is_deleted = false
+        """
+        result = await conn.execute(
+                query, 
+                updates.content, 
+                updates.status, 
+                id
+                )
+        if result == "UPDATE 0":
+            raise HTTPException(status_code=404, detail="ticket not found")
+        return {"ticketId": id, "updates": updates.dict(exclude_unset=True)}
 
 
 # Call
@@ -192,7 +228,7 @@ async def staffCallPassenger(sessionKey: str, id: int, db = Depends(get_db)):
         query = """
             select p.phone_no
             from passenger p
-            where p.passenger_id = $1
+            where p.passenger_id = $1 and p.is_deleted = false
         """
         val = await conn.fetchval(query, id)
         if not val:
@@ -207,7 +243,7 @@ async def staffCallDriver(sessionKey: str, id: int, db = Depends(get_db)):
         query = """
             select d.phone_no
             from driver d
-            where d.driver_id = $1
+            where d.driver_id = $1 and d.is_deleted = false
         """
         val = await conn.fetchval(query, id)
         if not val:
@@ -225,7 +261,7 @@ async def viewAllPassengers(sessionKey: str, searchStr: Optional[str] = None, db
             select p.passenger_id, u.name, p.cnic, p.phone_no, p.inserted_at
             from passenger p
             join appuser u on p.passenger_id = u.user_id
-            where 1=1
+            where p.is_deleted = false
         """
         params = []
         if searchStr:
@@ -254,7 +290,7 @@ async def viewPassengerDetails(sessionKey: str, id: int, db = Depends(get_db)):
             select p.passenger_id, u.name, p.cnic, p.phone_no
             from passenger p
             join appuser u on p.passenger_id = u.user_id
-            where p.passenger_id = $1
+            where p.passenger_id = $1 and p.is_deleted = false
         """
         row = await conn.fetchrow(query, id)
         if not row:
@@ -272,7 +308,7 @@ async def viewAllDrivers(sessionKey: str, searchStr: Optional[str] = None, db = 
             select d.driver_id, u.name, d.cnic, d.phone_no, d.inserted_at
             from driver d
             join appuser u on d.driver_id = u.user_id
-            where 1=1
+            where d.is_deleted = false
         """
         params = []
         if searchStr:
@@ -297,11 +333,11 @@ async def viewDriverDetails(sessionKey: str, id: int, db = Depends(get_db)):
     async with db.acquire() as conn:
         query = """
             select d.driver_id, u.name, d.cnic, d.phone_no,
-                   v.make, v.model, v.plate_no, v.engine_no, v.chassis_no
+                    v.make, v.model, v.plate_no, v.engine_no, v.chassis_no
             from driver d
             join appuser u on d.driver_id = u.user_id
             left join vehicle v on d.driver_id = v.driver_id
-            where d.driver_id = $1
+            where d.driver_id = $1 and d.is_deleted = false
         """
         row = await conn.fetchrow(query, id)
         if not row:
