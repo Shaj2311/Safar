@@ -1,3 +1,7 @@
+@import "bootstrap/dist/css/bootstrap.min.css";
+@import "bootstrap-icons/font/bootstrap-icons.css";
+@import "leaflet/dist/leaflet.css";
+
 :root {
   --safar-green: #84CDB0;
   --safar-red: #e74c3c;
@@ -129,6 +133,14 @@ html, body, #root {
 .drawer-item-title {
   font-size: 1.1rem;
   font-weight: 500;
+}
+
+/* Custom logo styling for Safar */
+.safar-logo-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+  margin-top: 3rem;
 }
 
 .drawer-item-price {
