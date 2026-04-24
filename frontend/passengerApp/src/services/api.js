@@ -144,3 +144,19 @@ export const submitRideRating = async (rideId, rating) => {
         throw error;
     }
 };
+
+export const getDriverProfile = async (driverId) => {
+    try {
+        const sessionKey = localStorage.getItem('sessionKey');
+        const response = await fetch(`${BASE_URL}/users/${driverId}/profile?sessionKey=${sessionKey}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch driver profile');
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error("API Error: getDriverProfile", error);
+        throw error;
+    }
+};
