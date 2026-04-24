@@ -7,7 +7,7 @@ export const loginRequest = async (credentials) => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(credentials), // expects { name, password }
+            body: JSON.stringify(credentials), // API ko sirf name aur password chahiye
         });
         
         if (!response.ok) {
@@ -32,7 +32,7 @@ export const signupPassenger = async (userData) => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(userData), // expects { name, password, phoneNo, cnic }
+            body: JSON.stringify(userData), // Naya user bananay ke liye ye details zaroori hain
         });
         
         if (!response.ok) {
@@ -47,7 +47,7 @@ export const signupPassenger = async (userData) => {
 };
 export const getNearbyDrivers = async (location) => {
     console.log("Mock API: getNearbyDrivers triggered with location", location);
-    // Left as mock since no exact matching endpoint in the spec for fetching nearby drivers
+    // Abhi asal endpoint nahi hai, is liye yeh mock function rakha hai taake app crash na ho
     return new Promise((resolve) => setTimeout(() => resolve({ drivers: [] }), 1000));
 };
 
@@ -64,7 +64,7 @@ export const createRideRequest = async (rideDetails) => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(rideDetails), // expects { pickup_x, pickup_y, dropoff_x, dropoff_y }
+            body: JSON.stringify(rideDetails), // Ride start aur drop location coordinates
         });
 
         if (!response.ok) {
@@ -74,6 +74,20 @@ export const createRideRequest = async (rideDetails) => {
         return await response.json();
     } catch (error) {
         console.error("API Error: createRideRequest", error);
+        throw error;
+    }
+};
+
+export const getRideStatus = async (rideId) => {
+    try {
+        const sessionKey = localStorage.getItem('sessionKey');
+        const response = await fetch(`${BASE_URL}/rides/${rideId}?sessionKey=${sessionKey}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch ride status');
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("API Error: getRideStatus", error);
         throw error;
     }
 };

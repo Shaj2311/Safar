@@ -1,14 +1,44 @@
 import React, { useState } from 'react';
 import { MapPlaceholder } from './MapPlaceholder';
+import { createRideRequest } from '../services/api';
 
-export const VehicleSelection = ({ setCurrentScreen, onMenuClick }) => {
+export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRideId }) => {
   const [activeVehicle, setActiveVehicle] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const options = [
     { id: 'mini', name: 'Safar Mini', price: 'Rs. 450', icon: 'bi-car-front-fill' },
     { id: 'auto', name: 'Safar Auto', price: 'Rs. 200', icon: 'bi-taxi-front-fill' },
     { id: 'bike', name: 'Safar Bike', price: 'Rs. 150', icon: 'bi-bicycle' }
   ];
+
+  const handleConfirmRide = async () => {
+    if (!activeVehicle) return;
+    setLoading(true);
+    try {
+      // Asal map integration abhi baqi hai, is liye fake coordinates bhej rahe hain testing ke liye
+      const response = await createRideRequest({
+        pickup_x: 31.5204,
+        pickup_y: 74.3587,
+        dropoff_x: 31.4504,
+        dropoff_y: 74.3587
+      });
+      
+      // Backend naya ride banayega aur uska id wapis karega, jo aagay tracking mein use hoga
+      if (response && response.id) {
+        setCurrentRideId(response.id);
+      } else if (response && response.ride_id) {
+        setCurrentRideId(response.ride_id);
+      }
+      
+      setLoading(false);
+      setCurrentScreen('searching');
+    } catch (error) {
+      console.error("Failed to create ride:", error);
+      alert("Failed to request ride. Check your connection.");
+      setLoading(false);
+    }
+  };
 
   return (
     <MapPlaceholder onMenuClick={onMenuClick}>
@@ -41,11 +71,11 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick }) => {
         <div className="p-4 bg-white">
             <button 
               className="btn btn-safar-primary w-100 rounded-pill"
-              onClick={() => setCurrentScreen('searching')}
-              disabled={!activeVehicle}
-              style={{ opacity: activeVehicle ? 1 : 0.5 }}
+              onClick={handleConfirmRide}
+              disabled={!activeVehicle || loading}
+              style={{ opacity: activeVehicle && !loading ? 1 : 0.5 }}
             >
-              Confirm Ride
+              {loading ? 'Requesting...' : 'Confirm Ride'}
             </button>
         </div>
       </div>
