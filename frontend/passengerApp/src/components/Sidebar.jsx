@@ -22,7 +22,7 @@ export const Sidebar = ({ onClose, setCurrentScreen }) => {
         <div className="sidebar-nav">
           <div className="sidebar-link" onClick={() => navigateTo('history')} style={{ cursor: 'pointer' }}>Trip History</div>
           <div className="sidebar-link">Payment Methods</div>
-          <div className="sidebar-link">Settings</div>
+          <div className="sidebar-link" onClick={() => navigateTo('settings')} style={{ cursor: 'pointer' }}>Settings</div>
           <div className="sidebar-link mt-4" onClick={handleLogout} style={{ cursor: 'pointer' }}>Log Out</div>
         </div>
       </div>
