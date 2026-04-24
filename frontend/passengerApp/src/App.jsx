@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { MapPlaceholder } from './components/MapPlaceholder';
 import { Login } from './components/Login';
 import { Home } from './components/Home';
 import { VehicleSelection } from './components/VehicleSelection';
@@ -15,15 +14,19 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState('login');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentRideId, setCurrentRideId] = useState(null);
+  
+  // Lifted state for mapping and routing
+  const [pickup, setPickup] = useState(null);
+  const [dropoff, setDropoff] = useState(null);
 
   const renderScreen = () => {
     switch (currentScreen) {
       case 'login':
         return <Login setCurrentScreen={setCurrentScreen} />;
       case 'home':
-        return <Home setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} />;
+        return <Home setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} pickup={pickup} setPickup={setPickup} dropoff={dropoff} setDropoff={setDropoff} />;
       case 'vehicle-selection':
-        return <VehicleSelection setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} setCurrentRideId={setCurrentRideId} />;
+        return <VehicleSelection setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} setCurrentRideId={setCurrentRideId} pickup={pickup} dropoff={dropoff} />;
       case 'searching':
         return <Searching setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} />;
       case 'driver-arrived':
@@ -43,7 +46,6 @@ function App() {
 
   return (
     <div className="mobile-container">
-      {/* UI ko real mobile app jaisa dikhane ke liye fake status bar */}
       <div className="status-bar">
         <span>9:41</span>
         <span>
@@ -54,7 +56,6 @@ function App() {
       
       {renderScreen()}
 
-      {/* Menu button press hone par yeh sidebar khulay ga */}
       {isSidebarOpen && (
         <Sidebar onClose={() => setIsSidebarOpen(false)} setCurrentScreen={setCurrentScreen} />
       )}

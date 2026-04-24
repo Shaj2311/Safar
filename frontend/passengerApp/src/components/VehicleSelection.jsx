@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MapPlaceholder } from './MapPlaceholder';
 import { createRideRequest } from '../services/api';
 
-export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRideId }) => {
+export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRideId, pickup, dropoff }) => {
   const [activeVehicle, setActiveVehicle] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -13,18 +13,18 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
   ];
 
   const handleConfirmRide = async () => {
-    if (!activeVehicle) return;
+    if (!activeVehicle || !pickup || !dropoff) return;
+    
     setLoading(true);
     try {
-      // Asal map integration abhi baqi hai, is liye fake coordinates bhej rahe hain testing ke liye
+      // Ab real map coordinates send kar rahe hain backend ko!
       const response = await createRideRequest({
-        pickup_x: 31.5204,
-        pickup_y: 74.3587,
-        dropoff_x: 31.4504,
-        dropoff_y: 74.3587
+        pickup_x: pickup.lat,
+        pickup_y: pickup.lng,
+        dropoff_x: dropoff.lat,
+        dropoff_y: dropoff.lng
       });
       
-      // Backend naya ride banayega aur uska id wapis karega, jo aagay tracking mein use hoga
       if (response && response.tripId) {
         setCurrentRideId(response.tripId);
       } else if (response && response.id) {
@@ -43,7 +43,7 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
   };
 
   return (
-    <MapPlaceholder onMenuClick={onMenuClick}>
+    <MapPlaceholder onMenuClick={onMenuClick} pickup={pickup} dropoff={dropoff}>
       <div className="overlay-drawer p-0">
         <div className="text-center py-4 fs-4 fw-bold bg-white" style={{ borderTopLeftRadius: '30px', borderTopRightRadius: '30px' }}>
           Choose a ride
@@ -53,29 +53,30 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
             {options.map(option => (
               <div 
                 key={option.id}
-                className="drawer-item px-4 mx-3 my-2 bg-light rounded"
+                className="drawer-item px-4 mx-3 my-2 bg-light rounded shadow-sm"
                 style={{ 
                   cursor: 'pointer', 
-                  border: activeVehicle === option.id ? '2px solid var(--safar-green)' : '2px solid transparent',
-                  padding: '15px 0'
+                  border: activeVehicle === option.id ? '3px solid #80CCA5' : '3px solid transparent',
+                  padding: '15px 0',
+                  transition: '0.2s all'
                 }}
                 onClick={() => setActiveVehicle(option.id)}
               >
                 <div className="d-flex align-items-center">
-                    <i className={`${option.icon} fs-1 me-4 text-secondary`}></i>
+                    <i className={`${option.icon} fs-1 me-4 ${activeVehicle === option.id ? 'text-dark' : 'text-secondary'}`}></i>
                     <span className="drawer-item-title fw-bold fs-5">{option.name}</span>
                 </div>
-                <span className="drawer-item-price fw-bold fs-5">{option.price}</span>
+                <span className="drawer-item-price fw-bold fs-5 text-success">{option.price}</span>
               </div>
             ))}
         </div>
 
         <div className="p-4 bg-white">
             <button 
-              className="btn btn-safar-primary w-100 rounded-pill"
+              className="btn w-100 rounded-pill py-3 fw-bold fs-5 text-white"
               onClick={handleConfirmRide}
               disabled={!activeVehicle || loading}
-              style={{ opacity: activeVehicle && !loading ? 1 : 0.5 }}
+              style={{ backgroundColor: '#80CCA5', opacity: activeVehicle && !loading ? 1 : 0.5 }}
             >
               {loading ? 'Requesting...' : 'Confirm Ride'}
             </button>
