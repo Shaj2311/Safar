@@ -25,6 +25,26 @@ export const loginRequest = async (credentials) => {
     }
 };
 
+export const signupPassenger = async (userData) => {
+    try {
+        const response = await fetch(`${BASE_URL}/auth/signup/passenger`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(userData), // expects { name, password, phoneNo, cnic }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Signup failed');
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error("API Error: signupPassenger", error);
+        throw error;
+    }
+};
 export const getNearbyDrivers = async (location) => {
     console.log("Mock API: getNearbyDrivers triggered with location", location);
     // Left as mock since no exact matching endpoint in the spec for fetching nearby drivers

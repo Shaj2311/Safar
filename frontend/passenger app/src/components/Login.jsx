@@ -1,22 +1,31 @@
 import React, { useState } from 'react';
-import { loginRequest } from '../services/api';
+import { loginRequest, signupPassenger } from '../services/api';
 
 export const Login = ({ setCurrentScreen }) => {
+  const [isSignup, setIsSignup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [phoneNo, setPhoneNo] = useState('');
+  const [cnic, setCnic] = useState('');
   const [error, setError] = useState(null);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      await loginRequest({ name, password });
+      if (isSignup) {
+        await signupPassenger({ name, password, phoneNo, cnic: cnic || null });
+        // Automatically login after successful signup
+        await loginRequest({ name, password });
+      } else {
+        await loginRequest({ name, password });
+      }
       setLoading(false);
       setCurrentScreen('home');
     } catch (err) {
-      setError('Login failed. Please check your credentials.');
+      setError(isSignup ? 'Sign-up failed. Please check your details.' : 'Login failed. Please check your credentials.');
       setLoading(false);
     }
   };
@@ -35,18 +44,40 @@ export const Login = ({ setCurrentScreen }) => {
         </div>
       </div>
 
-      <h3 className="text-center mb-5 fw-bold" style={{ color: '#2c3e50' }}>Passenger App</h3>
+      <h3 className="text-center mb-5 fw-bold" style={{ color: '#2c3e50' }}>{isSignup ? 'Create Account' : 'Passenger App'}</h3>
 
-      <form onSubmit={handleLogin} className="flex-grow-1 d-flex flex-column">
+      <form onSubmit={handleSubmit} className="flex-grow-1 d-flex flex-column">
         {error && <div className="alert alert-danger p-2 mb-3">{error}</div>}
+        
         <input
           type="text"
           className="safar-input"
-          placeholder="Username or Phone Number"
+          placeholder="Username"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
         />
+        
+        {isSignup && (
+          <>
+            <input
+              type="text"
+              className="safar-input"
+              placeholder="Phone Number"
+              value={phoneNo}
+              onChange={(e) => setPhoneNo(e.target.value)}
+              required
+            />
+            <input
+              type="text"
+              className="safar-input"
+              placeholder="CNIC (Optional)"
+              value={cnic}
+              onChange={(e) => setCnic(e.target.value)}
+            />
+          </>
+        )}
+
         <input
           type="password"
           className="safar-input"
@@ -62,13 +93,22 @@ export const Login = ({ setCurrentScreen }) => {
             className="btn btn-safar-primary w-100"
             disabled={loading}
           >
-            {loading ? 'Logging in...' : 'Log In'}
+            {loading ? 'Processing...' : (isSignup ? 'Sign Up' : 'Log In')}
           </button>
         </div>
 
         <div className="mt-auto mb-4 d-flex justify-content-between align-items-center">
-          <span className="text-muted">Don't have an account?</span>
-          <button type="button" className="btn btn-safar-primary px-4 rounded-pill">Sign Up</button>
+          <span className="text-muted">{isSignup ? 'Already have an account?' : "Don't have an account?"}</span>
+          <button 
+            type="button" 
+            className="btn btn-safar-primary px-4 rounded-pill"
+            onClick={() => {
+              setIsSignup(!isSignup);
+              setError(null);
+            }}
+          >
+            {isSignup ? 'Log In' : 'Sign Up'}
+          </button>
         </div>
       </form>
     </div>
