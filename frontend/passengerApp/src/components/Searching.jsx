@@ -1,8 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapPlaceholder } from './MapPlaceholder';
-import { getRideStatus } from '../services/api';
+import { getRideStatus, cancelRideRequest } from '../services/api';
 
 export const Searching = ({ setCurrentScreen, currentRideId }) => {
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     let pollingInterval;
     let isMounted = true;
@@ -42,6 +44,25 @@ export const Searching = ({ setCurrentScreen, currentRideId }) => {
     };
   }, [setCurrentScreen, currentRideId]);
 
+  const handleCancel = async () => {
+    if (!currentRideId) {
+      setCurrentScreen('home');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await cancelRideRequest(currentRideId);
+      // Agar API successful ho gayi toh home pe jao
+      setLoading(false);
+      setCurrentScreen('home');
+    } catch (error) {
+      console.error("Failed to cancel ride:", error);
+      alert("Failed to cancel the ride. Check your connection.");
+      setLoading(false);
+    }
+  };
+
   return (
     <MapPlaceholder>
       <div className="overlay-drawer text-center">
@@ -51,9 +72,11 @@ export const Searching = ({ setCurrentScreen, currentRideId }) => {
         
         <button 
           className="btn btn-safar-danger w-100 rounded-pill py-3"
-          onClick={() => setCurrentScreen('home')}
+          onClick={handleCancel}
+          disabled={loading}
+          style={{ opacity: loading ? 0.7 : 1 }}
         >
-          Cancel Ride
+          {loading ? 'Canceling...' : 'Cancel Ride'}
         </button>
       </div>
     </MapPlaceholder>

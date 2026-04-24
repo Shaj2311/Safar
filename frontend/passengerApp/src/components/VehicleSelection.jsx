@@ -25,7 +25,9 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
       });
       
       // Backend naya ride banayega aur uska id wapis karega, jo aagay tracking mein use hoga
-      if (response && response.id) {
+      if (response && response.tripId) {
+        setCurrentRideId(response.tripId);
+      } else if (response && response.id) {
         setCurrentRideId(response.id);
       } else if (response && response.ride_id) {
         setCurrentRideId(response.ride_id);
