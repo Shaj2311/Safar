@@ -9,6 +9,7 @@ import { TripCompleted } from './components/TripCompleted';
 import { Rating } from './components/Rating';
 import { Sidebar } from './components/Sidebar';
 import { History } from './components/History';
+import { Settings } from './components/Settings';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState('login');
@@ -33,6 +34,8 @@ function App() {
         return <Rating setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} />;
       case 'history':
         return <History setCurrentScreen={setCurrentScreen} />;
+      case 'settings':
+        return <Settings setCurrentScreen={setCurrentScreen} />;
       default:
         return <Login setCurrentScreen={setCurrentScreen} />;
     }

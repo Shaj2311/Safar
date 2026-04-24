@@ -160,3 +160,30 @@ export const getDriverProfile = async (driverId) => {
         throw error;
     }
 };
+
+export const updatePassengerProfile = async (profileData) => {
+    try {
+        const sessionKey = localStorage.getItem('sessionKey');
+        const url = new URL(`${BASE_URL}/users/me/passenger`, window.location.origin);
+        if (sessionKey) {
+            url.searchParams.append('sessionKey', sessionKey);
+        }
+
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(profileData)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update profile');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("API Error: updatePassengerProfile", error);
+        throw error;
+    }
+};
