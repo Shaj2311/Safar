@@ -14,6 +14,9 @@ def validate_session(session_key: str):
     Returns userId if valid, otherwise raises HTTPException.
     """
     # Check existence in sessions dict
+    print("Validating session key ", session_key)
+    print("Active sessions:")
+    print(sessions)
     session_data = sessions.get(session_key)
     if not session_data:
         raise HTTPException(status_code=401, detail="unauthorized")

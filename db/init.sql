@@ -41,7 +41,7 @@ CREATE TABLE Trip (
   trip_id bigint generated always as identity,
   passenger_id bigint,
   driver_id bigint,
-  start_time timestamptz not null default now(),
+  start_time timestamptz,
   end_time timestamptz,
   pickup_loc point not null,
   dropoff_loc point not null,
@@ -63,7 +63,7 @@ CREATE TABLE Staff (
   staff_id bigint PRIMARY KEY REFERENCES AppUser(user_id) ON DELETE CASCADE,
   cnic varchar,
   phone_no varchar(20) not null,
-  role varchar(20) not null check (role in ('admin', 'support')),
+  role varchar(20) not null check (role in ('admin', 'support', 'super')),
   is_deleted boolean not null default false,
   inserted_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -182,89 +182,14 @@ CREATE TABLE Rating (
 );
 
 
--- -- Insert Drivers
--- WITH new_user AS (
---     INSERT INTO AppUser (name, password)
---     VALUES ('Driver A', 'pass1')
---     RETURNING user_id
--- )
--- INSERT INTO Driver (driver_id, cnic, phone_no)
--- SELECT user_id, '11111-1111111-1', '01001111111'
--- FROM new_user;
--- 
--- WITH new_user AS (
---     INSERT INTO AppUser (name, password)
---     VALUES ('Driver B', 'pass2')
---     RETURNING user_id
--- )
--- INSERT INTO Driver (driver_id, cnic, phone_no)
--- SELECT user_id, '22222-2222222-2', '02002222222'
--- FROM new_user;
--- 
--- 
--- 
--- -- Insert Passengers
--- WITH new_user AS (
---     INSERT INTO AppUser (name, password)
---     VALUES ('Passenger A', 'passA')
---     RETURNING user_id
--- )
--- INSERT INTO Passenger (passenger_id, cnic, phone_no)
--- SELECT user_id, '33333-3333333-3', '03003333333'
--- FROM new_user;
--- 
--- 
--- WITH new_user AS (
---     INSERT INTO AppUser (name, password)
---     VALUES ('Passenger B', 'passB')
---     RETURNING user_id
--- )
--- INSERT INTO Passenger (passenger_id, cnic, phone_no)
--- SELECT user_id, '44444-4444444-4', '04004444444'
--- FROM new_user;
--- 
--- 
--- 
--- 
--- INSERT INTO Vehicle (driver_id, make, model, engine_no, chassis_no, plate_no) VALUES
--- (1, 'Toyota', 'Corolla', 'ENG001', 'CHA001', 'ABC-001'),
--- (2, 'Honda', 'Civic', 'ENG002', 'CHA002', 'XYZ-002');
--- 
--- 
--- 
--- 
--- -- Insert Staff
--- WITH new_user AS (
---     INSERT INTO AppUser (name, password)
---     VALUES ('Admin 1', 'adminpass')
---     RETURNING user_id
--- )
--- INSERT INTO Staff (staff_id, cnic, phone_no, role)
--- SELECT user_id, '55555-5555555-5', '05005555555', 'admin'
--- FROM new_user;
--- 
--- 
--- WITH new_user AS (
---     INSERT INTO AppUser (name, password)
---     VALUES ('Support 1', 'supportpass')
---     RETURNING user_id
--- )
--- INSERT INTO Staff (staff_id, cnic, phone_no, role)
--- SELECT user_id, '66666-6666666-6', '06006666666', 'support'
--- FROM new_user;
--- 
--- 
--- 
--- INSERT INTO Trip (passenger_id, driver_id, pickup_loc, dropoff_loc, estimated_dist) VALUES
--- (3, 1, point(0,0), point(1,1), 10.0);
-
 INSERT INTO AppUser (name, password) VALUES 
 ('John Driver', 'securepass123'),
 ('Jane Driver', 'securepass456'),
 ('Alice Passenger', 'alicepass'),
 ('Bob Passenger', 'bobpass'),
 ('Charlie Admin', 'adminpass'),
-('Dana Support', 'supportpass');
+('Dana Support', 'supportpass'),
+('Superman', 'super');
 
 INSERT INTO Driver (driver_id, cnic, phone_no, is_deleted, inserted_at, updated_at) VALUES
 (1, '42101-1234567-1', '+923001112221', false, now(), now()),
@@ -276,7 +201,8 @@ INSERT INTO Passenger (passenger_id, cnic, phone_no, is_deleted, inserted_at, up
 
 INSERT INTO Staff (staff_id, cnic, phone_no, role, is_deleted, inserted_at, updated_at) VALUES
 (5, '42101-9999999-5', '+923005556665', 'admin', false, now(), now()),
-(6, '42101-8888888-6', '+923005556666', 'support', false, now(), now());
+(6, '42101-8888888-6', '+923005556666', 'support', false, now(), now()),
+(7, '42101-8888888-7', '+923005556666', 'super', false, now(), now());
 
 INSERT INTO Vehicle (driver_id, make, model, engine_no, chassis_no, plate_no, owner_name, owner_cnic, is_deleted, inserted_at, updated_at) VALUES
 (1, 'Toyota', 'Corolla', 'ENG-101', 'CHS-101', 'ABC-123', 'John Driver', '42101-1234567-1', false, now(), now()),
