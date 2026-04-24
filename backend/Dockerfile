@@ -9,7 +9,16 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend/ .
+COPY ./ .
+
+
+
+ENV POSTGRES_USER=postgres
+ENV POSTGRES_PASSWORD=postgres
+ENV POSTGRES_DB=safar-database
+
+ENV DATABASE_HOST=34.66.244.134
+ENV DATABASE_PORT=5432
 
 EXPOSE 8000
 

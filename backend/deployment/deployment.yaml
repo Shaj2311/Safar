@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: safar-backend-deployment
+  labels:
+    app: safar-backend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: safar-backend-deployment
+  template:
+    metadata:
+      labels:
+        app: safar-backend-deployment
+    spec:
+      containers:
+      - name: backend-container
+        # Switched to :latest tag for better reliability
+        image: us-central1-docker.pkg.dev/project-b054c456-52e8-4026-af3/my-repo/backend:latest
+        imagePullPolicy: Always
+        # --- This pulls all variables from your secret ---
+        envFrom:
+        - secretRef:
+            name: backend-env
+        # -----------------------------------------------
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 500m
+            memory: 2Gi
+      restartPolicy: Always
