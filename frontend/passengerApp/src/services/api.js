@@ -117,3 +117,30 @@ export const cancelRideRequest = async (rideId) => {
         throw error;
     }
 };
+
+export const submitRideRating = async (rideId, rating) => {
+    try {
+        const sessionKey = localStorage.getItem('sessionKey');
+        const url = new URL(`${BASE_URL}/rides/${rideId}/rate`, window.location.origin);
+        if (sessionKey) {
+            url.searchParams.append('sessionKey', sessionKey);
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ score: rating })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to submit rating');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("API Error: submitRideRating", error);
+        throw error;
+    }
+};
