@@ -54,7 +54,7 @@ export const getNearbyDrivers = async (location) => {
 export const createRideRequest = async (rideDetails) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
-        const url = new URL(`${BASE_URL}/rides/`);
+        const url = new URL(`${BASE_URL}/rides/`, window.location.origin);
         if (sessionKey) {
             url.searchParams.append('sessionKey', sessionKey);
         }
@@ -88,6 +88,32 @@ export const getRideStatus = async (rideId) => {
         return await response.json();
     } catch (error) {
         console.error("API Error: getRideStatus", error);
+        throw error;
+    }
+};
+
+export const cancelRideRequest = async (rideId) => {
+    try {
+        const sessionKey = localStorage.getItem('sessionKey');
+        const url = new URL(`${BASE_URL}/rides/${rideId}/cancel`, window.location.origin);
+        if (sessionKey) {
+            url.searchParams.append('sessionKey', sessionKey);
+        }
+
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to cancel ride');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("API Error: cancelRideRequest", error);
         throw error;
     }
 };
