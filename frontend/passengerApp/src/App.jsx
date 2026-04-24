@@ -13,6 +13,7 @@ import { History } from './components/History';
 function App() {
   const [currentScreen, setCurrentScreen] = useState('login');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentRideId, setCurrentRideId] = useState(null);
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -21,15 +22,15 @@ function App() {
       case 'home':
         return <Home setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} />;
       case 'vehicle-selection':
-        return <VehicleSelection setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} />;
+        return <VehicleSelection setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} setCurrentRideId={setCurrentRideId} />;
       case 'searching':
-        return <Searching setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} />;
+        return <Searching setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} />;
       case 'driver-arrived':
-        return <DriverArrived setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} />;
+        return <DriverArrived setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} />;
       case 'trip-completed':
-        return <TripCompleted setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} />;
+        return <TripCompleted setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} />;
       case 'rating':
-        return <Rating setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} />;
+        return <Rating setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} />;
       case 'history':
         return <History setCurrentScreen={setCurrentScreen} />;
       default:
@@ -39,7 +40,7 @@ function App() {
 
   return (
     <div className="mobile-container">
-      {/* Fake status bar for realism */}
+      {/* UI ko real mobile app jaisa dikhane ke liye fake status bar */}
       <div className="status-bar">
         <span>9:41</span>
         <span>
@@ -50,7 +51,7 @@ function App() {
       
       {renderScreen()}
 
-      {/* Sidebar Overlay */}
+      {/* Menu button press hone par yeh sidebar khulay ga */}
       {isSidebarOpen && (
         <Sidebar onClose={() => setIsSidebarOpen(false)} setCurrentScreen={setCurrentScreen} />
       )}

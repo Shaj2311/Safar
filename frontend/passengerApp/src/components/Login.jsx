@@ -17,7 +17,7 @@ export const Login = ({ setCurrentScreen }) => {
     try {
       if (isSignup) {
         await signupPassenger({ name, password, phoneNo, cnic: cnic || null });
-        // Automatically login after successful signup
+        // Signup successful hone ke baad user ko dobara login na karna paray
         await loginRequest({ name, password });
       } else {
         await loginRequest({ name, password });
