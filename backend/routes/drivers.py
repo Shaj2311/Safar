@@ -37,9 +37,11 @@ async def checkIncomingRequests(sessionKey: str, db = Depends(get_db)):
 
     async with db.acquire() as conn:
         query = """
-            select trip_id, passenger_id, pickup_loc, dropoff_loc, estimated_dist
-            from trip
-            where driver_id is null and is_deleted = false
+            select t.trip_id, t.passenger_id, a.name, p.phone_no, t.pickup_loc, t.dropoff_loc, t.estimated_dist
+            from trip t
+            join appuser a on t.passenger_id = a.user_id
+            join passenger p on t.passenger_id = p.passenger_id
+            where t.driver_id is null and t.is_deleted = false
         """
         rows = await conn.fetch(query)
 
