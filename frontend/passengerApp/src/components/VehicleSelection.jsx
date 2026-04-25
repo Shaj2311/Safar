@@ -1,20 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPlaceholder } from './MapPlaceholder';
 import { createRideRequest } from '../services/api';
 
+const getRouteInfo = (pickup, dropoff, callback) => {
+  if (!pickup || !dropoff || !window.google) return;
+  const service = new window.google.maps.DirectionsService();
+  service.route(
+    {
+      origin: { lat: pickup.lat, lng: pickup.lng },
+      destination: { lat: dropoff.lat, lng: dropoff.lng },
+      travelMode: window.google.maps.TravelMode.DRIVING,
+    },
+    (result, status) => {
+      if (status === 'OK') {
+        const leg = result.routes[0].legs[0];
+        callback({
+          distanceText: leg.distance.text,
+          distanceKm: leg.distance.value / 1000,
+          durationText: leg.duration.text,
+        });
+      }
+    }
+  );
+};
+
 export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRideId, pickup, dropoff }) => {
-  const [activeVehicle, setActiveVehicle] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [routeInfo, setRouteInfo] = useState(null);
 
-  const options = [
-    { id: 'mini', name: 'Safar Mini', price: 'Rs. 450', icon: 'bi-car-front-fill' },
-    { id: 'auto', name: 'Safar Auto', price: 'Rs. 200', icon: 'bi-taxi-front-fill' },
-    { id: 'bike', name: 'Safar Bike', price: 'Rs. 150', icon: 'bi-bicycle' }
-  ];
+  useEffect(() => {
+    getRouteInfo(pickup, dropoff, (info) => setRouteInfo(info));
+  }, [pickup, dropoff]);
 
-  const handleConfirmRide = async () => {
-    if (!activeVehicle || !pickup || !dropoff) return;
+  const fare = routeInfo ? Math.round(routeInfo.distanceKm * 100) : null;
 
+  const handleOrderSafar = async () => {
+    if (!pickup || !dropoff) return;
     setLoading(true);
     try {
       const response = await createRideRequest({
@@ -31,8 +52,8 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
       setLoading(false);
       setCurrentScreen('searching');
     } catch (error) {
-      console.error("Failed to create ride:", error);
-      alert("Failed to request ride. Check your connection.");
+      console.error('Failed to create ride:', error);
+      alert('Failed to request ride. Check your connection.');
       setLoading(false);
     }
   };
@@ -40,42 +61,56 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
   return (
     <MapPlaceholder onMenuClick={onMenuClick} pickup={pickup} dropoff={dropoff}>
       <div className="overlay-drawer p-0">
-        <div className="text-center py-4 fs-4 fw-bold bg-white" style={{ borderTopLeftRadius: '30px', borderTopRightRadius: '30px' }}>
-          Choose a ride
+
+        {/* Header */}
+        <div className="text-center py-4 bg-white" style={{ borderTopLeftRadius: '30px', borderTopRightRadius: '30px' }}>
+          <h5 className="fw-bold mb-0">Your Safar</h5>
         </div>
 
-        <div className="bg-light py-2">
-          {options.map(option => (
-            <div
-              key={option.id}
-              className="drawer-item px-4 mx-3 my-2 bg-light rounded shadow-sm"
-              style={{
-                cursor: 'pointer',
-                border: activeVehicle === option.id ? '3px solid #80CCA5' : '3px solid transparent',
-                padding: '15px 0',
-                transition: '0.2s all'
-              }}
-              onClick={() => setActiveVehicle(option.id)}
-            >
-              <div className="d-flex align-items-center">
-                <i className={`${option.icon} fs-1 me-4 ${activeVehicle === option.id ? 'text-dark' : 'text-secondary'}`}></i>
-                <span className="drawer-item-title fw-bold fs-5">{option.name}</span>
-              </div>
-              <span className="drawer-item-price fw-bold fs-5 text-success">{option.price}</span>
+        {/* Fare & Info Card */}
+        <div className="bg-light px-4 py-4 mx-3 my-3 rounded-3 shadow-sm">
+          <div className="d-flex align-items-center justify-content-between mb-3">
+            <div className="d-flex align-items-center">
+              <i className="bi bi-car-front-fill fs-1 me-3 text-dark"></i>
+              <div className="fw-bold fs-5">Safar</div>
             </div>
-          ))}
+            <div className="fw-bold fs-5 text-success">
+              {fare !== null ? `Rs. ${fare}` : 'Calculating...'}
+            </div>
+          </div>
+
+          {/* Stats Row */}
+          <div className="d-flex justify-content-around pt-3" style={{ borderTop: '1px solid #ddd' }}>
+            <div className="text-center">
+              <i className="bi bi-geo-alt-fill text-success mb-1 d-block"></i>
+              <div className="fw-bold small">{routeInfo ? routeInfo.distanceText : '—'}</div>
+              <div className="text-muted" style={{ fontSize: '0.75rem' }}>Distance</div>
+            </div>
+            <div className="text-center">
+              <i className="bi bi-clock-fill text-success mb-1 d-block"></i>
+              <div className="fw-bold small">{routeInfo ? routeInfo.durationText : '—'}</div>
+              <div className="text-muted" style={{ fontSize: '0.75rem' }}>Est. Time</div>
+            </div>
+            <div className="text-center">
+              <i className="bi bi-cash-coin text-success mb-1 d-block"></i>
+              <div className="fw-bold small">Cash</div>
+              <div className="text-muted" style={{ fontSize: '0.75rem' }}>Payment</div>
+            </div>
+          </div>
         </div>
 
+        {/* Order Button */}
         <div className="p-4 bg-white">
           <button
             className="btn w-100 rounded-pill py-3 fw-bold fs-5 text-white"
-            onClick={handleConfirmRide}
-            disabled={!activeVehicle || loading}
-            style={{ backgroundColor: '#80CCA5', opacity: activeVehicle && !loading ? 1 : 0.5 }}
+            onClick={handleOrderSafar}
+            disabled={loading}
+            style={{ backgroundColor: '#80CCA5', opacity: loading ? 0.6 : 1 }}
           >
-            {loading ? 'Requesting...' : 'Confirm Ride'}
+            {loading ? 'Requesting...' : 'Order Safar'}
           </button>
         </div>
+
       </div>
     </MapPlaceholder>
   );
