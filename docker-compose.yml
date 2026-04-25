@@ -27,12 +27,21 @@ services:
     volumes:
       - ./backend:/app
 
-  frontend:
+  passenger_frontend:
     build: ./frontend/passengerApp
+    container_name: passenger-frontend
     environment:
       - VITE_API_URL=http://backend:8000
     ports:
       - "5173:5173"
+
+  admin_frontend:
+    build: ./frontend/AdminPanel
+    container_name: admin-frontend
+    environment:
+      - VITE_API_URL=http://backend:8000
+    ports:
+      - "5174:5174"
 
 volumes:
   postgres_data:
