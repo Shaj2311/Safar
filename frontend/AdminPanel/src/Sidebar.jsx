@@ -10,8 +10,8 @@ const Sidebar = () => {
       className="d-flex flex-column bg-white border-end"
       style={{ width: '240px', minHeight: '100vh' }}
     >
-      <div className="px-4 py-3 border-bottom">
-        <img src="/safar-logo.svg" alt="Safar" style={{ height: '48px', width: 'auto' }} />
+      <div className="px-4 py-4 border-bottom d-flex justify-content-center">
+        <img src="/safar-logo.svg" alt="Safar" style={{ height: '72px', width: 'auto' }} />
       </div>
 
       <nav className="d-flex flex-column pt-2">
