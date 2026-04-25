@@ -10,13 +10,13 @@ export const AddressAutocomplete = ({ placeholder, onSelectAddress, defaultValue
     clearSuggestions,
   } = usePlacesAutocomplete({
     requestOptions: {
-      // Pakistan ke locations ko prefer karo
       componentRestrictions: { country: 'pk' },
     },
     debounce: 400,
   });
 
-  // Default value set karo agar already koi location select hai
+  const [locating, setLocating] = useState(false);
+
   useEffect(() => {
     if (defaultValue) {
       setValue(defaultValue, false);
@@ -35,6 +35,38 @@ export const AddressAutocomplete = ({ placeholder, onSelectAddress, defaultValue
     }
   };
 
+  // GPS button: get device location and reverse-geocode to a real address
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude: lat, longitude: lng } = position.coords;
+        try {
+          const results = await getGeocode({ location: { lat, lng } });
+          const address = results[0]?.formatted_address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          setValue(address, false);
+          clearSuggestions();
+          onSelectAddress({ lat, lng, address });
+        } catch (err) {
+          console.error('Reverse geocode error:', err);
+          alert('Could not get your address. Try typing it instead.');
+        } finally {
+          setLocating(false);
+        }
+      },
+      (err) => {
+        console.error('Geolocation error:', err);
+        alert('Could not get your location. Please allow location access.');
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
   const isPickup = placeholder.toLowerCase().includes('pickup');
 
   return (
@@ -49,6 +81,21 @@ export const AddressAutocomplete = ({ placeholder, onSelectAddress, defaultValue
           className="form-control border-0 bg-transparent shadow-none p-0 fw-bold"
           style={{ color: '#333333' }}
         />
+        {/* Show GPS button only for pickup field */}
+        {isPickup && (
+          <button
+            onClick={handleUseCurrentLocation}
+            disabled={locating}
+            className="btn p-0 ms-2"
+            title="Use current location"
+            style={{ lineHeight: 1, color: locating ? '#aaa' : '#84CDB0' }}
+          >
+            {locating
+              ? <span className="spinner-border spinner-border-sm" role="status" />
+              : <i className="bi bi-crosshair2 fs-5"></i>
+            }
+          </button>
+        )}
       </div>
 
       {status === 'OK' && (
