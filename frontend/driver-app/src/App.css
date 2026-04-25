@@ -1,0 +1,67 @@
+/* Mobile Desktop Background */
+body,
+html {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  background-color: #2d3748 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* The Phone Frame Constraints */
+.mobile-frame {
+  width: 375px;
+  height: 812px;
+  overflow: hidden;
+  border: 10px solid #1a202c;
+  border-radius: 40px;
+  background-color: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* safar input*/
+.safar-input {
+  background-color: #f0f2f5;
+  border: none;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  width: 100%;
+  outline: none;
+  color: #1F2937 !important;
+}
+
+.btn-safar-primary {
+  background-color: #20c997;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 25px;
+  font-weight: bold;
+}
+
+.btn-safar-primary:hover {
+  background-color: #1aa179;
+  color: white;
+}
+
+.safar-logo-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+/* Force all main action buttons to use dark text and be bold */
+button,
+.btn,
+.btn-safar-primary {
+  color: #1F2937 !important;
+  font-weight: 700 !important;
+}
