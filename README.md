@@ -20,3 +20,13 @@ Safar features Google maps API integration for location fetching and tracking, t
 You can view full API documentation at http://34.31.187.1:8000/redoc
 
 ## Try It Out
+Try out the passenger app [here](http://safarpassenger.syedhaiderali.com)
+
+## Local Testing
+To run this project locally, do the following:
+```
+git clone https://github.com/Shaj2311/Safar
+cd Safar
+docker compose up -d --build
+```
+Then, visit **work in progress**
