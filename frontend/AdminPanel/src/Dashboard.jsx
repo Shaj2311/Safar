@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from './services/api';
 
 const Dashboard = () => {
-  const [kpis] = useState({
-    totalRides: 1245,
-    activeCaptains: 34,
-    totalPassengers: 890,
-    todaysRevenue: 145000,
+  const [kpis, setKpis] = useState({
+    totalRides: 0,
+    activeCaptains: 0,
+    totalPassengers: 0,
+    todaysRevenue: 0,
   });
+  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // Keeping dummy data for the second endpoint (Recent Rides) for now
   const [recentRides] = useState([
     { id: '#TRP-001', passenger: 'Ali Khan', captain: 'Ahmed Driver', status: 'Ongoing', fare: 450 },
     { id: '#TRP-002', passenger: 'Sara Ahmed', captain: 'Kamran Ali', status: 'Completed', fare: 320 },
@@ -15,6 +20,33 @@ const Dashboard = () => {
     { id: '#TRP-004', passenger: 'Ayesha Gul', captain: 'Zain Abbas', status: 'Cancelled', fare: 0 },
     { id: '#TRP-005', passenger: 'Omer Farooq', captain: 'Saad Malik', status: 'Ongoing', fare: 410 },
   ]);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        // api.js handles appending the base URL and safar_admin_token automatically
+        const response = await api.get('/super/stats');
+        
+        // Mapping backend response to our UI state.
+        // We fallback to 0 if certain fields (like revenue) are missing from the stats payload
+        setKpis({
+          totalRides: response.data.total_trips || 0,
+          activeCaptains: response.data.active_drivers || 0,
+          totalPassengers: response.data.total_passengers || 0, 
+          todaysRevenue: response.data.todays_revenue || 0, 
+        });
+      } catch (err) {
+        console.error("Error fetching dashboard stats:", err);
+        setError("Failed to load dashboard metrics. Please check your connection.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const getBadgeClass = (status) => {
     switch (status) {
@@ -27,6 +59,11 @@ const Dashboard = () => {
 
   return (
     <div>
+      {error && (
+        <div className="alert alert-danger mb-4" role="alert">
+          {error}
+        </div>
+      )}
 
       <div className="row g-4 mb-4">
         <div className="col-12 col-sm-6 col-xl-3">
@@ -36,7 +73,9 @@ const Dashboard = () => {
                 <h6 className="card-subtitle text-muted mb-0">Total Rides</h6>
                 <span className="text-secondary fs-5">🚗</span>
               </div>
-              <h3 className="card-title fw-bold mb-1">{kpis.totalRides.toLocaleString()}</h3>
+              <h3 className="card-title fw-bold mb-1">
+                {loading ? '...' : kpis.totalRides.toLocaleString()}
+              </h3>
               <small className="text-success fw-medium">+8% this week</small>
             </div>
           </div>
@@ -48,7 +87,9 @@ const Dashboard = () => {
                 <h6 className="card-subtitle text-muted mb-0">Today's Revenue</h6>
                 <span className="text-secondary fs-5">💰</span>
               </div>
-              <h3 className="card-title fw-bold mb-1">Rs. {kpis.todaysRevenue.toLocaleString()}</h3>
+              <h3 className="card-title fw-bold mb-1">
+                {loading ? '...' : `Rs. ${kpis.todaysRevenue.toLocaleString()}`}
+              </h3>
               <small className="text-success fw-medium">+12% this week</small>
             </div>
           </div>
@@ -60,7 +101,9 @@ const Dashboard = () => {
                 <h6 className="card-subtitle text-muted mb-0">Active Captains</h6>
                 <span className="text-secondary fs-5">👤</span>
               </div>
-              <h3 className="card-title fw-bold mb-1">{kpis.activeCaptains}</h3>
+              <h3 className="card-title fw-bold mb-1">
+                {loading ? '...' : kpis.activeCaptains}
+              </h3>
               <small className="text-success fw-medium">+2% this week</small>
             </div>
           </div>
@@ -72,7 +115,9 @@ const Dashboard = () => {
                 <h6 className="card-subtitle text-muted mb-0">Total Passengers</h6>
                 <span className="text-secondary fs-5">👤</span>
               </div>
-              <h3 className="card-title fw-bold mb-1">{kpis.totalPassengers.toLocaleString()}</h3>
+              <h3 className="card-title fw-bold mb-1">
+                {loading ? '...' : kpis.totalPassengers.toLocaleString()}
+              </h3>
               <small className="text-success fw-medium">+15% this week</small>
             </div>
           </div>

@@ -40,10 +40,22 @@ const Header = ({ onLogout }) => {
 };
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('safar_admin_token') !== null;
+  });
 
-  const handleLogin = () => setIsAuthenticated(true);
-  const handleLogout = () => setIsAuthenticated(false);
+  const handleLogin = () => {
+    // Note: The actual token should be set by Login.jsx upon a successful API response.
+    // We'll set a dummy token here just to test the layout flow until Login is wired up.
+    if (!localStorage.getItem('safar_admin_token')) {
+      localStorage.setItem('safar_admin_token', 'dummy_token_123');
+    }
+    setIsAuthenticated(true);
+  };
+  const handleLogout = () => {
+    localStorage.removeItem('safar_admin_token');
+    setIsAuthenticated(false);
+  };
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
