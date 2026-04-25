@@ -54,6 +54,8 @@ async def checkIncomingRequests(sessionKey: str, db = Depends(get_db)):
             requests.append({
                 "tripId": row["trip_id"],
                 "passengerId": row["passenger_id"],
+                "passengerName": row["name"],
+                "passengerPhoneNo": row["phone_no"],
                 "pickup": {"x": p_loc.x, "y": p_loc.y},
                 "dropoff": {"x": d_loc.x, "y": d_loc.y},
                 "dist": float(row["estimated_dist"]) if row["estimated_dist"] else 0.0
