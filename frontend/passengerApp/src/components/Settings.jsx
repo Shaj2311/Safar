@@ -34,8 +34,13 @@ export const Settings = ({ setCurrentScreen }) => {
 
     try {
       await updatePassengerProfile(payload);
+      
+      // Update local storage if name was changed so the UI (sidebar) reflects it
+      if (payload.name) {
+        localStorage.setItem('passengerName', payload.name);
+      }
+      
       alert('Profile Settings successfully updated!');
-      // Update success hone ke baad form clear kar do ya wapis home pe bhej do
       setCurrentScreen('home');
     } catch (error) {
       console.error(error);
