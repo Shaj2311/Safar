@@ -33,4 +33,8 @@ git clone https://github.com/Shaj2311/Safar
 cd Safar
 docker compose up -d --build
 ```
-Then, visit **work in progress**
+Then, visit the following to view their respective applications
+| URL | Application |
+|----|----|
+| http://localhost:5173 | Passenger Application|
+| http://localhost:5174 | Admin Panel|
