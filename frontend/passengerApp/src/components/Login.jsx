@@ -17,11 +17,12 @@ export const Login = ({ setCurrentScreen }) => {
     try {
       if (isSignup) {
         await signupPassenger({ name, password, phoneNo, cnic: cnic || null });
-        // Signup successful hone ke baad user ko dobara login na karna paray
         await loginRequest({ name, password });
       } else {
         await loginRequest({ name, password });
       }
+      // Save name so sidebar can show the logged-in user's name
+      localStorage.setItem('passengerName', name);
       setLoading(false);
       setCurrentScreen('home');
     } catch (err) {
