@@ -187,3 +187,18 @@ export const updatePassengerProfile = async (profileData) => {
         throw error;
     }
 };
+
+export const getRideSummary = async (rideId) => {
+    try {
+        const sessionKey = localStorage.getItem('sessionKey');
+        const response = await fetch(`${BASE_URL}/rides/${rideId}/summary?sessionKey=${sessionKey}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch ride summary');
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("API Error: getRideSummary", error);
+        throw error;
+    }
+};
+
