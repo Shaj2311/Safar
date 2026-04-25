@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       host: '0.0.0.0',
+      allowedHosts: ['safarpassenger.syedhaiderali.com'],
       port: 5173,
       proxy: {
         '/api': {
