@@ -130,20 +130,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="card shadow-sm mb-4 border-0 rounded-3">
-        <div className="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
-          <h4 className="card-title mb-0 fw-semibold text-dark">Rides This Week</h4>
-        </div>
-        <div className="card-body p-4">
-          <div
-            className="w-100 rounded d-flex flex-column align-items-center justify-content-center text-muted"
-            style={{ height: '300px', backgroundColor: '#f8f9fa', border: '2px dashed #dee2e6' }}
-          >
-            <p className="mb-1 fw-medium fs-5">Chart Component Placeholder</p>
-            <small>Bar/Line chart will be integrated here</small>
-          </div>
-        </div>
-      </div>
+
 
       <div className="card shadow-sm border-0 rounded-3">
         <div className="card-header bg-white border-bottom-0 pt-4 pb-2 px-4">
