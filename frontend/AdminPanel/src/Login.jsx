@@ -1,18 +1,48 @@
 import React, { useState } from 'react';
+import api from './services/api';
 
 const Login = ({ onLogin }) => {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name || !password) {
       setError('Please enter both username and password.');
       return;
     }
-    setError('');
-    onLogin();
+    
+    try {
+      setError('');
+      setLoading(true);
+      
+      const response = await api.post('/auth/login/staff', {
+        name,
+        password
+      });
+
+      // The backend will return the session key. Since the schema is empty in docs, 
+      // we check a few common property names. We'll log it if we can't find it.
+      const token = response.data.sessionKey || response.data.access_token || response.data.token || response.data;
+      
+      // Basic check to make sure token is a string/valid and not an empty object
+      if (token && typeof token === 'string') {
+        localStorage.setItem('safar_admin_token', token);
+        onLogin();
+      } else {
+        console.warn("Login payload received:", response.data);
+        setError('Login successful, but no valid token was found in the response. Check console.');
+      }
+      
+    } catch (err) {
+      console.error("Login error:", err);
+      const errorMessage = err.response?.data?.detail || err.response?.data?.message || 'Invalid credentials or server error.';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -46,6 +76,7 @@ const Login = ({ onLogin }) => {
                 placeholder="admin"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={loading}
               />
             </div>
 
@@ -59,15 +90,24 @@ const Login = ({ onLogin }) => {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
               />
             </div>
 
             <button
               type="submit"
-              className="btn w-100 fw-semibold py-2 rounded-3 text-white"
+              className="btn w-100 fw-semibold py-2 rounded-3 text-white d-flex justify-content-center align-items-center gap-2"
               style={{ backgroundColor: '#2ec4a9', border: 'none' }}
+              disabled={loading}
             >
-              Sign In
+              {loading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                  Signing In...
+                </>
+              ) : (
+                'Sign In'
+              )}
             </button>
           </form>
 
