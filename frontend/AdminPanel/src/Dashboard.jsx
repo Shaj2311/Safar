@@ -19,7 +19,6 @@ const Dashboard = () => {
         setLoading(true);
         setError(null);
         
-        // Fetch stats, passengers, tickets, and rides concurrently
         const [statsRes, passengersRes, ticketsRes, ridesRes] = await Promise.all([
           api.get('/super/stats'),
           api.get('/staff/passengers'),
@@ -34,22 +33,19 @@ const Dashboard = () => {
           supportTickets: ticketsRes.data.length || 0, 
         });
 
-        // Map the backend rides array. We slice to 5 so it fits nicely on the dashboard.
         const ridesList = Array.isArray(ridesRes.data) ? ridesRes.data : [];
         const formattedRides = ridesList.slice(0, 5).map(ride => ({
           id: `#TRP-${ride.tripId ?? ride.id ?? '???'}`,
-          // Passenger and Driver are directly returned as strings or null in this endpoint
           passenger: (typeof ride.passenger === 'string' ? ride.passenger : ride.passenger?.name) || 'Unknown',
           captain: (typeof ride.driver === 'string' ? ride.driver : ride.driver?.name) || 'Unassigned',
           status: ride.status || 'Pending',
-          // Use nullish coalescing (??) instead of OR (||) so we don't accidentally override a valid 0 fare
+          // using ?? so a valid 0 fare doesnt get overriden
           fare: ride.fare ?? ride.price ?? 0
         }));
 
         setRecentRides(formattedRides);
 
       } catch (err) {
-        console.error("Error fetching dashboard data:", err);
         setError("Failed to load dashboard metrics. Please check your connection.");
       } finally {
         setLoading(false);
@@ -129,8 +125,6 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-
-
 
       <div className="card shadow-sm border-0 rounded-3">
         <div className="card-header bg-white border-bottom-0 pt-4 pb-2 px-4">

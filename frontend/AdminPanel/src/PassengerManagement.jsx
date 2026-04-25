@@ -11,17 +11,17 @@ const PassengerManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // New states for the UI fixes
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedPassenger, setSelectedPassenger] = useState(null);
   const dropdownRef = useRef(null);
 
-  // Action states
+
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState(null);
 
-  // Close dropdown when clicking outside
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -103,7 +103,7 @@ const PassengerManagement = () => {
     setActionSuccess(null);
     try {
       const role = localStorage.getItem('safar_admin_role') || 'admin';
-      // Super Admin has a separate hard-delete endpoint
+      // super admin uses a different hard-delete route
       const endpoint = role === 'super' || role === 'super_admin'
         ? `/super/passengers/${selectedPassenger.rawId}`
         : `/admin/passengers/${selectedPassenger.rawId}`;
@@ -126,7 +126,7 @@ const PassengerManagement = () => {
         </div>
       )}
 
-      {/* Passenger Details Modal */}
+
       {selectedPassenger && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered">
@@ -209,7 +209,7 @@ const PassengerManagement = () => {
           />
         </div>
         <div className="col-md-4 col-lg-3">
-          {/* Custom Bootstrap Dropdown replacing the native <select> */}
+
           <div className="dropdown" ref={dropdownRef}>
             <button 
               className="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center bg-white" 

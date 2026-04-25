@@ -4,9 +4,9 @@ const api = axios.create({
   baseURL: '/api',
 });
 
+// attaches sessionKey to every request automatically
 api.interceptors.request.use(
   (config) => {
-    // The OpenAPI spec shows sessionKey in query parameters
     const token = localStorage.getItem('safar_admin_token');
     if (token) {
       config.params = { ...config.params, sessionKey: token };
