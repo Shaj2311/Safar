@@ -65,14 +65,6 @@ function App() {
 
   return (
     <div className="mobile-container">
-      <div className="status-bar">
-        <span>9:41</span>
-        <span>
-          <i className="bi bi-wifi me-2"></i>
-          <i className="bi bi-battery-full"></i>
-        </span>
-      </div>
-
       {renderScreen()}
 
       {isSidebarOpen && (

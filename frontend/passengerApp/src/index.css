@@ -1,6 +1,5 @@
 @import "bootstrap/dist/css/bootstrap.min.css";
 @import "bootstrap-icons/font/bootstrap-icons.css";
-@import "leaflet/dist/leaflet.css";
 
 :root {
   --safar-green: #84CDB0;
@@ -170,18 +169,6 @@ html, body, #root {
   letter-spacing: 2px;
 }
 
-.status-bar {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 20px;
-  font-weight: bold;
-  font-size: 14px;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 20;
-}
 
 .hamburger-menu {
   position: absolute;
