@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Dashboard from './Dashboard';
 import PassengerManagement from './PassengerManagement';
 import CaptainManagement from './CaptainManagement';
+import ActiveRides from './ActiveRides';
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/passengers" element={<PassengerManagement />} />
         <Route path="/captains" element={<CaptainManagement />} />
+        <Route path="/rides" element={<ActiveRides />} />
       </Routes>
     </Router>
   );
