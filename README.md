@@ -24,7 +24,8 @@ Safar features Google maps API integration for location fetching and tracking, t
 You can view full API documentation at http://34.31.187.1:8000/redoc
 
 ## Try It Out
-Try out the passenger app [here](http://safarpassenger.syedhaiderali.com)
+Try out the passenger app [here](http://safarpassenger.syedhaiderali.com)<br>
+Try out the admin panel [here](http://34.133.245.222)
 
 ## Local Testing
 To run this project locally, do the following:
@@ -38,3 +39,4 @@ Then, visit the following to view their respective applications
 |----|----|
 | http://localhost:5173 | Passenger Application|
 | http://localhost:5174 | Admin Panel|
+| http://localhost:5175 | Driver Application|
