@@ -30,8 +30,8 @@ const Dashboard = () => {
       <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
         <h2 className="m-0 fw-semibold text-dark">Overview Dashboard</h2>
         <div className="d-flex align-items-center gap-3">
-          <div 
-            className="rounded-circle bg-secondary bg-opacity-25" 
+          <div
+            className="rounded-circle bg-secondary bg-opacity-25"
             style={{ width: '40px', height: '40px' }}
           ></div>
           <button className="btn btn-outline-secondary btn-sm fw-medium">Log Out</button>
@@ -94,7 +94,7 @@ const Dashboard = () => {
           <h4 className="card-title mb-0 fw-semibold text-dark">Rides This Week</h4>
         </div>
         <div className="card-body p-4">
-          <div 
+          <div
             className="w-100 rounded d-flex flex-column align-items-center justify-content-center text-muted"
             style={{ height: '300px', backgroundColor: '#f8f9fa', border: '2px dashed #dee2e6' }}
           >
@@ -128,7 +128,7 @@ const Dashboard = () => {
                     <td className="py-3 text-dark">{ride.captain}</td>
                     <td className="py-3 text-dark">Rs. {ride.fare}</td>
                     <td className="pe-4 py-3">
-                      <span 
+                      <span
                         className={`badge rounded-pill ${getBadgeClass(ride.status)} px-3 py-2 fw-medium`}
                         style={{ minWidth: '90px' }}
                       >
