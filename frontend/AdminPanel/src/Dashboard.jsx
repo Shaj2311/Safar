@@ -9,17 +9,9 @@ const Dashboard = () => {
     supportTickets: 0,
   });
   
+  const [recentRides, setRecentRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // Keeping dummy data for the second endpoint (Recent Rides) for now
-  const [recentRides] = useState([
-    { id: '#TRP-001', passenger: 'Ali Khan', captain: 'Ahmed Driver', status: 'Ongoing', fare: 450 },
-    { id: '#TRP-002', passenger: 'Sara Ahmed', captain: 'Kamran Ali', status: 'Completed', fare: 320 },
-    { id: '#TRP-003', passenger: 'Usman Tariq', captain: 'Bilal Khan', status: 'Ongoing', fare: 550 },
-    { id: '#TRP-004', passenger: 'Ayesha Gul', captain: 'Zain Abbas', status: 'Cancelled', fare: 0 },
-    { id: '#TRP-005', passenger: 'Omer Farooq', captain: 'Saad Malik', status: 'Ongoing', fare: 410 },
-  ]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -27,20 +19,35 @@ const Dashboard = () => {
         setLoading(true);
         setError(null);
         
-        // Fetch stats, passengers, and tickets concurrently to save time
-        const [statsRes, passengersRes, ticketsRes] = await Promise.all([
+        // Fetch stats, passengers, tickets, and rides concurrently
+        const [statsRes, passengersRes, ticketsRes, ridesRes] = await Promise.all([
           api.get('/super/stats'),
           api.get('/staff/passengers'),
-          api.get('/staff/tickets')
+          api.get('/staff/tickets'),
+          api.get('/staff/rides')
         ]);
         
         setKpis({
           totalRides: statsRes.data.total_trips || 0,
           activeCaptains: statsRes.data.active_drivers || 0,
-          // Calculate totals based on array length
           totalPassengers: passengersRes.data.length || 0, 
           supportTickets: ticketsRes.data.length || 0, 
         });
+
+        // Map the backend rides array. We slice to 5 so it fits nicely on the dashboard.
+        const ridesList = Array.isArray(ridesRes.data) ? ridesRes.data : [];
+        const formattedRides = ridesList.slice(0, 5).map(ride => ({
+          id: `#TRP-${ride.tripId ?? ride.id ?? '???'}`,
+          // Passenger and Driver are directly returned as strings or null in this endpoint
+          passenger: (typeof ride.passenger === 'string' ? ride.passenger : ride.passenger?.name) || 'Unknown',
+          captain: (typeof ride.driver === 'string' ? ride.driver : ride.driver?.name) || 'Unassigned',
+          status: ride.status || 'Pending',
+          // Use nullish coalescing (??) instead of OR (||) so we don't accidentally override a valid 0 fare
+          fare: ride.fare ?? ride.price ?? 0
+        }));
+
+        setRecentRides(formattedRides);
+
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         setError("Failed to load dashboard metrics. Please check your connection.");
@@ -53,12 +60,11 @@ const Dashboard = () => {
   }, []);
 
   const getBadgeClass = (status) => {
-    switch (status) {
-      case 'Ongoing': return 'bg-warning text-dark';
-      case 'Completed': return 'bg-success';
-      case 'Cancelled': return 'bg-danger';
-      default: return 'bg-secondary';
-    }
+    const s = status.toLowerCase();
+    if (s.includes('ongoing') || s.includes('active') || s.includes('progress')) return 'bg-warning text-dark';
+    if (s.includes('completed') || s.includes('done')) return 'bg-success';
+    if (s.includes('cancelled') || s.includes('failed')) return 'bg-danger';
+    return 'bg-secondary';
   };
 
   return (
@@ -149,29 +155,44 @@ const Dashboard = () => {
               <thead className="table-light">
                 <tr>
                   <th className="ps-4 text-muted fw-semibold py-3 border-bottom">Ride ID</th>
-                  <th className="text-muted fw-semibold py-3 border-bottom">Passenger Name</th>
-                  <th className="text-muted fw-semibold py-3 border-bottom">Captain Name</th>
+                  <th className="text-muted fw-semibold py-3 border-bottom">Passenger</th>
+                  <th className="text-muted fw-semibold py-3 border-bottom">Captain</th>
                   <th className="text-muted fw-semibold py-3 border-bottom">Fare</th>
                   <th className="pe-4 text-muted fw-semibold py-3 border-bottom">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {recentRides.map((ride, index) => (
-                  <tr key={index} className="border-bottom">
-                    <td className="ps-4 fw-medium text-secondary py-3">{ride.id}</td>
-                    <td className="py-3 text-dark">{ride.passenger}</td>
-                    <td className="py-3 text-dark">{ride.captain}</td>
-                    <td className="py-3 text-dark">Rs. {ride.fare}</td>
-                    <td className="pe-4 py-3">
-                      <span
-                        className={`badge rounded-pill ${getBadgeClass(ride.status)} px-3 py-2 fw-medium`}
-                        style={{ minWidth: '90px' }}
-                      >
-                        {ride.status}
-                      </span>
+                {loading ? (
+                  <tr>
+                    <td colSpan="5" className="text-center py-4 text-muted">
+                      <div className="spinner-border spinner-border-sm me-2" role="status"></div>
+                      Loading recent rides...
                     </td>
                   </tr>
-                ))}
+                ) : recentRides.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="text-center py-4 text-muted">
+                      No recent rides found.
+                    </td>
+                  </tr>
+                ) : (
+                  recentRides.map((ride, index) => (
+                    <tr key={index} className="border-bottom">
+                      <td className="ps-4 fw-medium text-secondary py-3">{ride.id}</td>
+                      <td className="py-3 text-dark">{ride.passenger}</td>
+                      <td className="py-3 text-dark">{ride.captain}</td>
+                      <td className="py-3 text-dark">Rs. {ride.fare}</td>
+                      <td className="pe-4 py-3">
+                        <span
+                          className={`badge rounded-pill ${getBadgeClass(ride.status)} px-3 py-2 fw-medium`}
+                          style={{ minWidth: '90px' }}
+                        >
+                          {ride.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
