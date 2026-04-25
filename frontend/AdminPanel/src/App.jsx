@@ -4,6 +4,7 @@ import Dashboard from './Dashboard';
 import PassengerManagement from './PassengerManagement';
 import CaptainManagement from './CaptainManagement';
 import ActiveRides from './ActiveRides';
+import SupportTickets from './SupportTickets';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/passengers" element={<PassengerManagement />} />
         <Route path="/captains" element={<CaptainManagement />} />
         <Route path="/rides" element={<ActiveRides />} />
+        <Route path="/support" element={<SupportTickets />} />
       </Routes>
     </Router>
   );
