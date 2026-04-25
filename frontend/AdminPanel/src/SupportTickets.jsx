@@ -1,27 +1,171 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import api from './services/api';
 
 const SupportTickets = () => {
-  const [tickets] = useState([
-    { id: '#TKT-301', reporter: 'Ali Khan', category: 'Billing', date: 'Apr 24, 2026', status: 'Open' },
-    { id: '#TKT-302', reporter: 'Ahmed Raza', category: 'Driver Behavior', date: 'Apr 23, 2026', status: 'In Progress' },
-    { id: '#TKT-303', reporter: 'Sara Ahmed', category: 'App Bug', date: 'Apr 23, 2026', status: 'Resolved' },
-    { id: '#TKT-304', reporter: 'Ayesha Gul', category: 'Ride Cancellation', date: 'Apr 22, 2026', status: 'Open' },
-    { id: '#TKT-305', reporter: 'Kamran Ali', category: 'Billing', date: 'Apr 22, 2026', status: 'In Progress' },
-    { id: '#TKT-306', reporter: 'Hira Nadeem', category: 'Safety Concern', date: 'Apr 21, 2026', status: 'Resolved' },
-    { id: '#TKT-307', reporter: 'Usman Tariq', category: 'App Bug', date: 'Apr 21, 2026', status: 'Open' },
-  ]);
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // State variables for Search, Filter, and Pagination
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // States for the UI components
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await api.get('/staff/tickets');
+        
+        // Defensive check in case the backend wraps the array
+        const rawTickets = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data.tickets || response.data.complaints || response.data.data || []);
+
+        // Safely map the backend payload using fallback properties
+        const mappedTickets = rawTickets.map(t => {
+          // The backend provides tripId and staffId instead of a direct reporter name.
+          // We will use Trip # as the reporter identifier if available.
+          const reporterName = t.tripId ? `Trip #${t.tripId}` : (t.staffId ? `Staff #${t.staffId}` : 'Unknown User');
+
+          // Clean up the date string (e.g., "2026-04-24 11:38:03.954346+00:00" -> "2026-04-24 11:38:03")
+          let cleanDate = String(t.date || t.created_at || t.createdAt || 'Recent');
+          if (cleanDate.includes('.')) {
+            cleanDate = cleanDate.split('.')[0];
+          }
+
+          return {
+            id: `#TKT-${t.ticketId ?? t.id ?? t.ticket_id ?? '???'}`,
+            reporter: reporterName,
+            category: String(t.desc || t.category || t.issue || t.subject || 'General Support'),
+            date: cleanDate,
+            status: String(t.status || t.state || 'Open')
+          };
+        });
+
+        setTickets(mappedTickets);
+      } catch (err) {
+        console.error("Error fetching tickets:", err);
+        setError(`Error: ${err.response?.status ? `Backend returned ${err.response.status}` : err.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTickets();
+  }, []);
 
   const getStatusBadge = (status) => {
-    switch (status) {
-      case 'Open': return 'bg-danger';
-      case 'In Progress': return 'bg-warning text-dark';
-      case 'Resolved': return 'bg-success';
-      default: return 'bg-secondary';
+    const s = status.toLowerCase();
+    if (s.includes('open') || s.includes('new') || s.includes('pending')) return 'bg-danger';
+    if (s.includes('progress') || s.includes('active')) return 'bg-warning text-dark';
+    if (s.includes('resolved') || s.includes('closed') || s.includes('done')) return 'bg-success';
+    return 'bg-secondary';
+  };
+
+  // Filter tickets based on Search and Dropdown
+  const filteredTickets = tickets.filter((t) => {
+    const matchesSearch = 
+      t.reporter.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.id.toLowerCase().includes(searchTerm.toLowerCase());
+      
+    const matchesStatus = filterStatus === 'All' || t.status.toLowerCase().includes(filterStatus.toLowerCase());
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  // Calculate Pagination
+  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage) || 1;
+  const paginatedTickets = filteredTickets.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (e, pageNumber) => {
+    e.preventDefault();
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
     }
   };
 
   return (
     <div>
+      {error && (
+        <div className="alert alert-danger mb-4" role="alert">
+          {error}
+        </div>
+      )}
+
+      {/* Ticket Details Modal */}
+      {selectedTicket && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-bottom-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark">Ticket Details</h5>
+                <button type="button" className="btn-close" onClick={() => setSelectedTicket(null)}></button>
+              </div>
+              <div className="modal-body py-4">
+                <div className="d-flex align-items-center mb-4">
+                  <div className="rounded-circle bg-danger bg-opacity-10 d-flex justify-content-center align-items-center me-3 text-danger" style={{ width: '64px', height: '64px', fontSize: '1.5rem' }}>
+                    <i className="bi bi-ticket-detailed">🎫</i>
+                  </div>
+                  <div>
+                    <h5 className="mb-0 fw-bold text-dark">{selectedTicket.category}</h5>
+                    <span className="text-muted fw-medium">{selectedTicket.id}</span>
+                  </div>
+                </div>
+                
+                <div className="row g-3">
+                  <div className="col-6">
+                    <div className="p-3 bg-light rounded-3 h-100">
+                      <small className="text-muted d-block mb-1 fw-semibold">Reporter ID</small>
+                      <span className="fw-bold text-dark">{selectedTicket.reporter}</span>
+                    </div>
+                  </div>
+                  <div className="col-6">
+                    <div className="p-3 bg-light rounded-3 h-100">
+                      <small className="text-muted d-block mb-1 fw-semibold">Date Submitted</small>
+                      <span className="fw-bold text-dark">{selectedTicket.date}</span>
+                    </div>
+                  </div>
+                  <div className="col-12">
+                    <div className="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center">
+                      <small className="text-muted fw-semibold">Ticket Status</small>
+                      <span className={`badge rounded-pill ${getStatusBadge(selectedTicket.status)} px-3 py-2 fw-medium`}>
+                        {selectedTicket.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer border-top-0 pt-0">
+                <button type="button" className="btn btn-secondary rounded-3 px-4 fw-medium" onClick={() => setSelectedTicket(null)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="row mb-4">
         <div className="col-md-8 col-lg-6 mb-3 mb-md-0">
@@ -29,15 +173,45 @@ const SupportTickets = () => {
             type="text"
             className="form-control"
             placeholder="Search by Ticket ID, Name, or Issue..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            disabled={loading}
           />
         </div>
         <div className="col-md-4 col-lg-3">
-          <select className="form-select">
-            <option value="All">All</option>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Resolved">Resolved</option>
-          </select>
+          {/* Custom Bootstrap Dropdown replacing native <select> */}
+          <div className="dropdown" ref={dropdownRef}>
+            <button 
+              className="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center bg-white" 
+              type="button" 
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              disabled={loading}
+            >
+              <span>{filterStatus === 'All' ? 'All Tickets' : filterStatus}</span>
+              <span className="dropdown-toggle"></span>
+            </button>
+            {isDropdownOpen && (
+              <ul className="dropdown-menu show w-100 shadow-sm border-0 mt-1" style={{ position: 'absolute', zIndex: 1000 }}>
+                {['All', 'Open', 'In Progress', 'Resolved'].map((statusOption) => (
+                  <li key={statusOption}>
+                    <button 
+                      className={`dropdown-item py-2 ${filterStatus === statusOption ? 'active bg-primary text-white' : ''}`} 
+                      onClick={() => {
+                        setFilterStatus(statusOption);
+                        setCurrentPage(1);
+                        setIsDropdownOpen(false);
+                      }}
+                    >
+                      {statusOption === 'All' ? 'All Tickets' : statusOption}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
 
@@ -48,7 +222,7 @@ const SupportTickets = () => {
               <thead className="table-light">
                 <tr>
                   <th className="ps-4 py-3 text-muted fw-semibold border-bottom">Ticket ID</th>
-                  <th className="py-3 text-muted fw-semibold border-bottom">Reporter</th>
+                  <th className="py-3 text-muted fw-semibold border-bottom">Reporter ID</th>
                   <th className="py-3 text-muted fw-semibold border-bottom">Issue Category</th>
                   <th className="py-3 text-muted fw-semibold border-bottom">Date</th>
                   <th className="py-3 text-muted fw-semibold border-bottom">Status</th>
@@ -56,28 +230,47 @@ const SupportTickets = () => {
                 </tr>
               </thead>
               <tbody>
-                {tickets.map((ticket, index) => (
-                  <tr key={index}>
-                    <td className="ps-4 py-3 fw-medium text-secondary">{ticket.id}</td>
-                    <td className="py-3 text-dark">{ticket.reporter}</td>
-                    <td className="py-3 text-dark">{ticket.category}</td>
-                    <td className="py-3 text-dark">{ticket.date}</td>
-                    <td className="py-3">
-                      <span
-                        className={`badge rounded-pill ${getStatusBadge(ticket.status)} px-3 py-2 fw-medium`}
-                        style={{ minWidth: '90px' }}
-                      >
-                        {ticket.status}
-                      </span>
-                    </td>
-                    <td className="pe-4 py-3">
-                      <div className="d-flex gap-2">
-                        <button className="btn btn-sm btn-primary fw-medium">View Thread</button>
-                        <button className="btn btn-sm btn-outline-success fw-medium">Mark Resolved</button>
-                      </div>
+                {loading ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-4 text-muted">
+                      <div className="spinner-border spinner-border-sm me-2" role="status"></div>
+                      Loading ticket data...
                     </td>
                   </tr>
-                ))}
+                ) : paginatedTickets.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-4 text-muted">
+                      No tickets found matching your criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedTickets.map((ticket, index) => (
+                    <tr key={index}>
+                      <td className="ps-4 py-3 fw-medium text-secondary">{ticket.id}</td>
+                      <td className="py-3 text-dark">{ticket.reporter}</td>
+                      <td className="py-3 text-dark">{ticket.category}</td>
+                      <td className="py-3 text-dark">{ticket.date}</td>
+                      <td className="py-3">
+                        <span
+                          className={`badge rounded-pill ${getStatusBadge(ticket.status)} px-3 py-2 fw-medium`}
+                          style={{ minWidth: '90px' }}
+                        >
+                          {ticket.status}
+                        </span>
+                      </td>
+                      <td className="pe-4 py-3">
+                        <div className="d-flex gap-2">
+                          <button 
+                            className="btn btn-sm btn-outline-primary fw-medium"
+                            onClick={() => setSelectedTicket(ticket)}
+                          >
+                            View
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -86,16 +279,39 @@ const SupportTickets = () => {
 
       <nav aria-label="Tickets pagination">
         <ul className="pagination justify-content-end mb-0">
-          <li className="page-item disabled">
-            <a className="page-link" href="#" tabIndex="-1" aria-disabled="true">Previous</a>
+          <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+            <a 
+              className="page-link" 
+              href="#" 
+              onClick={(e) => handlePageChange(e, currentPage - 1)}
+              tabIndex="-1" 
+              aria-disabled={currentPage === 1}
+            >
+              Previous
+            </a>
           </li>
-          <li className="page-item active" aria-current="page">
-            <a className="page-link" href="#">1</a>
-          </li>
-          <li className="page-item"><a className="page-link" href="#">2</a></li>
-          <li className="page-item"><a className="page-link" href="#">3</a></li>
-          <li className="page-item">
-            <a className="page-link" href="#">Next</a>
+          
+          {[...Array(totalPages)].map((_, i) => (
+            <li key={i} className={`page-item ${currentPage === i + 1 ? 'active' : ''}`}>
+              <a 
+                className="page-link" 
+                href="#"
+                onClick={(e) => handlePageChange(e, i + 1)}
+              >
+                {i + 1}
+              </a>
+            </li>
+          ))}
+
+          <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+            <a 
+              className="page-link" 
+              href="#"
+              onClick={(e) => handlePageChange(e, currentPage + 1)}
+              aria-disabled={currentPage === totalPages}
+            >
+              Next
+            </a>
           </li>
         </ul>
       </nav>
