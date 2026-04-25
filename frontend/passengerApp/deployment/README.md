@@ -2,7 +2,7 @@
 
 1. Make code changes
 
-2. Create a new docker (following commands in backend directory)
+2. Create a new docker (following commands in passengerApp directory)
 ```
 cd frontend/passengerApp
 docker build -t us-central1-docker.pkg.dev/project-b054c456-52e8-4026-af3/my-repo/frontend:latest .
