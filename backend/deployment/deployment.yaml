@@ -16,14 +16,11 @@ spec:
     spec:
       containers:
       - name: backend-container
-        # Switched to :latest tag for better reliability
         image: us-central1-docker.pkg.dev/project-b054c456-52e8-4026-af3/my-repo/backend:latest
         imagePullPolicy: Always
-        # --- This pulls all variables from your secret ---
         envFrom:
         - secretRef:
             name: backend-env
-        # -----------------------------------------------
         resources:
           requests:
             cpu: 500m
