@@ -5,19 +5,14 @@ const ActiveRides = () => {
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // State variables for Search, Filter, and Pagination
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
-  // States for the UI components
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedRide, setSelectedRide] = useState(null);
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -35,12 +30,10 @@ const ActiveRides = () => {
         setError(null);
         
         const response = await api.get('/staff/rides');
-        
-        // Defensive check
         const rawRides = Array.isArray(response.data) ? response.data : (response.data.rides || response.data.data || []);
 
-        // Safely map the backend payload using fallback properties
         const mappedRides = rawRides.map(ride => {
+          // pickup/dropoff can come back as an object with address or coords
           const pickupStr = ride.pickup ? (ride.pickup.address || `${ride.pickup.x?.toFixed(4)}, ${ride.pickup.y?.toFixed(4)}`) : 'Unknown';
           const dropoffStr = ride.dropoff ? (ride.dropoff.address || `${ride.dropoff.x?.toFixed(4)}, ${ride.dropoff.y?.toFixed(4)}`) : 'Unknown';
 
@@ -57,7 +50,6 @@ const ActiveRides = () => {
 
         setRides(mappedRides);
       } catch (err) {
-        console.error("Error fetching rides:", err);
         setError(`Error: ${err.response?.status ? `Backend returned ${err.response.status}` : err.message}`);
       } finally {
         setLoading(false);
@@ -75,19 +67,15 @@ const ActiveRides = () => {
     return 'bg-secondary';
   };
 
-  // Filter rides based on Search and Dropdown
   const filteredRides = rides.filter((r) => {
     const matchesSearch = 
       r.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.passenger.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.captain.toLowerCase().includes(searchTerm.toLowerCase());
-      
     const matchesStatus = filterStatus === 'All' || r.status.toLowerCase().includes(filterStatus.toLowerCase());
-    
     return matchesSearch && matchesStatus;
   });
 
-  // Calculate Pagination
   const totalPages = Math.ceil(filteredRides.length / itemsPerPage) || 1;
   const paginatedRides = filteredRides.slice(
     (currentPage - 1) * itemsPerPage,
@@ -109,7 +97,6 @@ const ActiveRides = () => {
         </div>
       )}
 
-      {/* Ride Details Modal */}
       {selectedRide && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered modal-lg">
@@ -121,7 +108,7 @@ const ActiveRides = () => {
               <div className="modal-body py-4">
                 <div className="d-flex align-items-center mb-4">
                   <div className="rounded-circle bg-primary bg-opacity-10 d-flex justify-content-center align-items-center me-3 text-primary" style={{ width: '64px', height: '64px', fontSize: '1.5rem' }}>
-                    <i className="bi bi-car-front-fill">🚗</i>
+                    🚗
                   </div>
                   <div>
                     <h5 className="mb-0 fw-bold text-dark">{selectedRide.id}</h5>
@@ -187,7 +174,6 @@ const ActiveRides = () => {
           />
         </div>
         <div className="col-md-4 col-lg-3">
-          {/* Custom Bootstrap Dropdown replacing native <select> */}
           <div className="dropdown" ref={dropdownRef}>
             <button 
               className="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center bg-white" 

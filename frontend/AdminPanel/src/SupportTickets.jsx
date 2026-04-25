@@ -5,26 +5,19 @@ const SupportTickets = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // State variables for Search, Filter, and Pagination
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
-  // States for the UI components
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const dropdownRef = useRef(null);
-
-  // Action states
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState(null);
   const [showEscalateInput, setShowEscalateInput] = useState(false);
   const [escalateReason, setEscalateReason] = useState('');
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -41,7 +34,6 @@ const SupportTickets = () => {
       setError(null);
       
       const response = await api.get('/staff/tickets');
-      
       const rawTickets = Array.isArray(response.data) 
         ? response.data 
         : (response.data.tickets || response.data.complaints || response.data.data || []);
@@ -50,11 +42,9 @@ const SupportTickets = () => {
         const reporterName = t.tripId ? `Trip #${t.tripId}` : (t.staffId ? `Staff #${t.staffId}` : 'Unknown User');
 
         let cleanDate = String(t.date || t.created_at || t.createdAt || 'Recent');
-        if (cleanDate.includes('.')) {
-          cleanDate = cleanDate.split('.')[0];
-        }
+        // backend sometimes sends microseconds, trim them off
+        if (cleanDate.includes('.')) cleanDate = cleanDate.split('.')[0];
 
-        // Store the raw numeric ID for API calls
         const rawId = t.ticketId ?? t.id ?? t.ticket_id ?? null;
 
         return {
@@ -69,7 +59,6 @@ const SupportTickets = () => {
 
       setTickets(mappedTickets);
     } catch (err) {
-      console.error("Error fetching tickets:", err);
       setError(`Error: ${err.response?.status ? `Backend returned ${err.response.status}` : err.message}`);
     } finally {
       setLoading(false);
@@ -114,7 +103,6 @@ const SupportTickets = () => {
       await api.delete(`/staff/tickets/${selectedTicket.rawId}`);
       setActionSuccess('Ticket deleted successfully.');
       fetchTickets();
-      // Close the modal after a brief moment so user can see the success message
       setTimeout(() => handleCloseModal(), 1200);
     } catch (err) {
       setActionError(err.response?.data?.detail || 'Failed to delete ticket.');
@@ -151,19 +139,15 @@ const SupportTickets = () => {
     return 'bg-secondary';
   };
 
-  // Filter tickets based on Search and Dropdown
   const filteredTickets = tickets.filter((t) => {
     const matchesSearch = 
       t.reporter.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.id.toLowerCase().includes(searchTerm.toLowerCase());
-      
     const matchesStatus = filterStatus === 'All' || t.status.toLowerCase().includes(filterStatus.toLowerCase());
-    
     return matchesSearch && matchesStatus;
   });
 
-  // Calculate Pagination
   const totalPages = Math.ceil(filteredTickets.length / itemsPerPage) || 1;
   const paginatedTickets = filteredTickets.slice(
     (currentPage - 1) * itemsPerPage,
@@ -188,7 +172,6 @@ const SupportTickets = () => {
         </div>
       )}
 
-      {/* Ticket Details Modal */}
       {selectedTicket && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered">
@@ -231,7 +214,6 @@ const SupportTickets = () => {
                   </div>
                 </div>
 
-                {/* Feedback messages */}
                 {actionError && (
                   <div className="alert alert-danger py-2 px-3 mb-3 rounded-3" style={{ fontSize: '0.875rem' }}>
                     {actionError}
@@ -243,7 +225,6 @@ const SupportTickets = () => {
                   </div>
                 )}
 
-                {/* Escalate reason input */}
                 {showEscalateInput && (
                   <div className="mb-3">
                     <label className="form-label fw-semibold text-dark" style={{ fontSize: '0.875rem' }}>Escalation Reason</label>
@@ -277,7 +258,6 @@ const SupportTickets = () => {
               </div>
 
               <div className="modal-footer border-top pt-2 d-flex flex-wrap gap-2">
-                {/* Resolve */}
                 {!isResolved && !showEscalateInput && (
                   <button
                     className="btn btn-success fw-medium"
@@ -289,7 +269,6 @@ const SupportTickets = () => {
                   </button>
                 )}
 
-                {/* Escalate */}
                 {!isResolved && !isEscalated && !showEscalateInput && (
                   <button
                     className="btn btn-warning fw-medium"
@@ -300,7 +279,6 @@ const SupportTickets = () => {
                   </button>
                 )}
 
-                {/* Delete */}
                 {!showEscalateInput && (
                   <button
                     className="btn btn-outline-danger fw-medium"
