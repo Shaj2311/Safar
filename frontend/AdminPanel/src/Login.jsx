@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 
 const Login = ({ onLogin }) => {
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError('Please enter both email and password.');
+    if (!name || !password) {
+      setError('Please enter both username and password.');
       return;
     }
     setError('');
@@ -38,14 +38,14 @@ const Login = ({ onLogin }) => {
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
               <label className="form-label fw-medium text-dark" style={{ fontSize: '0.875rem' }}>
-                Email Address
+                Username
               </label>
               <input
-                type="email"
+                type="text"
                 className="form-control rounded-3 py-2"
-                placeholder="admin@safar.pk"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
             </div>
 

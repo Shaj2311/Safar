@@ -5,7 +5,7 @@ const CaptainManagement = () => {
     { id: '#CPT-101', name: 'Ahmed Raza', phone: '0300-1122334', vehicle: 'Toyota Corolla — ABC-123', status: 'Approved' },
     { id: '#CPT-102', name: 'Kamran Ali', phone: '0311-5566778', vehicle: 'Honda Civic — XYZ-456', status: 'Pending Verification' },
     { id: '#CPT-103', name: 'Bilal Khan', phone: '0322-9988776', vehicle: 'Suzuki Alto — LMN-789', status: 'Approved' },
-    { id: '#CPT-104', name: 'Saad Malik', phone: '0333-4433221', vehicle: 'Toyota Yaris — PQR-321', status: 'Suspended' },
+    { id: '#CPT-104', name: 'Saad Malik', phone: '0333-4433221', vehicle: 'Toyota Yaris — PQR-321', status: 'Pending Verification' },
     { id: '#CPT-105', name: 'Omar Farooq', phone: '0344-7766554', vehicle: 'Kia Picanto — DEF-654', status: 'Approved' },
     { id: '#CPT-106', name: 'Tariq Mehmood', phone: '0301-2233445', vehicle: 'Suzuki Wagon R — GHI-987', status: 'Pending Verification' },
   ]);
@@ -14,7 +14,6 @@ const CaptainManagement = () => {
     switch (status) {
       case 'Approved': return 'bg-success';
       case 'Pending Verification': return 'bg-warning text-dark';
-      case 'Suspended': return 'bg-danger';
       default: return 'bg-secondary';
     }
   };
@@ -35,7 +34,6 @@ const CaptainManagement = () => {
             <option value="All">All</option>
             <option value="Approved">Approved</option>
             <option value="Pending Verification">Pending Verification</option>
-            <option value="Suspended">Suspended</option>
           </select>
         </div>
       </div>
@@ -72,13 +70,7 @@ const CaptainManagement = () => {
                     <td className="pe-4 py-3">
                       <div className="d-flex gap-2">
                         <button className="btn btn-sm btn-outline-primary fw-medium">View Docs</button>
-                        {captain.status === 'Approved' ? (
-                          <button className="btn btn-sm btn-outline-danger fw-medium">Suspend</button>
-                        ) : captain.status === 'Suspended' ? (
-                          <button className="btn btn-sm btn-outline-success fw-medium">Approve</button>
-                        ) : (
-                          <button className="btn btn-sm btn-outline-success fw-medium">Approve</button>
-                        )}
+                        <button className="btn btn-sm btn-outline-danger fw-medium">Delete</button>
                       </div>
                     </td>
                   </tr>
