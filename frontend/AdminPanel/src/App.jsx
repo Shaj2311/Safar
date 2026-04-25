@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import Login from './Login';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
 import PassengerManagement from './PassengerManagement';
@@ -15,7 +16,7 @@ const pageTitles = {
   '/tickets': 'Complaints & Tickets',
 };
 
-const Header = () => {
+const Header = ({ onLogout }) => {
   const { pathname } = useLocation();
   const title = pageTitles[pathname] || 'Admin Panel';
 
@@ -27,20 +28,34 @@ const Header = () => {
           className="rounded-circle bg-secondary bg-opacity-25"
           style={{ width: '38px', height: '38px' }}
         ></div>
-        <button className="btn btn-outline-secondary btn-sm fw-medium">Log Out</button>
+        <button
+          className="btn btn-outline-secondary btn-sm fw-medium"
+          onClick={onLogout}
+        >
+          Log Out
+        </button>
       </div>
     </div>
   );
 };
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const handleLogin = () => setIsAuthenticated(true);
+  const handleLogout = () => setIsAuthenticated(false);
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <Router>
       <div className="d-flex" style={{ height: '100vh' }}>
         <Sidebar />
 
         <div className="d-flex flex-column flex-grow-1 overflow-hidden">
-          <Header />
+          <Header onLogout={handleLogout} />
 
           <main className="flex-grow-1 overflow-auto p-4 bg-light">
             <Routes>
