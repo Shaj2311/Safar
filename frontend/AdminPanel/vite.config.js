@@ -10,10 +10,10 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0',
       //allowedHosts: [''], 
-      port: 5174, 
+      port: 5174,
       proxy: {
         '/api': {
-          target: env.VITE_API_URL, 
+          target: 'http://34.31.187.1:8000',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },

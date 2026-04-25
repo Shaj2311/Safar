@@ -21,7 +21,8 @@ const Header = ({ onLogout }) => {
   const title = pageTitles[pathname] || 'Admin Panel';
   
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const username = localStorage.getItem('safar_admin_username') || 'Admin User';
+  const username = localStorage.getItem('safar_admin_name') || 'Admin User';
+  const role = localStorage.getItem('safar_admin_role') || 'staff';
 
   return (
     <div className="d-flex justify-content-between align-items-center px-4 py-3 bg-white border-bottom">
@@ -35,7 +36,10 @@ const Header = ({ onLogout }) => {
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             <i className="bi bi-person-circle fs-5 text-primary"></i>
-            <span className="fw-medium text-dark">{username}</span>
+            <div className="text-start d-none d-sm-block" style={{ lineHeight: '1.2' }}>
+              <div className="fw-bold text-dark small" style={{ fontSize: '0.85rem' }}>{username}</div>
+              <div className="text-muted small text-capitalize" style={{ fontSize: '0.75rem' }}>{role}</div>
+            </div>
             <i className="bi bi-chevron-down ms-1 text-muted" style={{ fontSize: '0.75rem' }}></i>
           </button>
           
@@ -51,6 +55,7 @@ const Header = ({ onLogout }) => {
               <div className="dropdown-menu show position-absolute end-0 mt-2 shadow-sm border-0 rounded-3" style={{ minWidth: '220px', zIndex: 1050 }}>
                 <div className="px-4 py-3 border-bottom bg-light rounded-top">
                   <p className="mb-0 fw-bold text-dark fs-6">{username}</p>
+                  <small className="text-muted text-capitalize">{role} Account</small>
                 </div>
                 <div className="p-2">
                   <button
