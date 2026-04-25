@@ -1,18 +1,144 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import api from './services/api';
 
 const PassengerManagement = () => {
-  const [passengers] = useState([
-    { id: '#PSG-012', name: 'Fatima Ali', phone: '0300-1234567', totalRides: 15, status: 'Active' },
-    { id: '#PSG-013', name: 'Usman Tariq', phone: '0311-9876543', totalRides: 42, status: 'Active' },
-    { id: '#PSG-014', name: 'Ayesha Khan', phone: '0322-4567890', totalRides: 8, status: 'Active' },
-    { id: '#PSG-015', name: 'Bilal Ahmed', phone: '0333-1122334', totalRides: 120, status: 'Active' },
-    { id: '#PSG-016', name: 'Sara Malik', phone: '0344-5566778', totalRides: 2, status: 'Active' },
-    { id: '#PSG-017', name: 'Zain Abbas', phone: '0301-9988776', totalRides: 27, status: 'Active' },
-    { id: '#PSG-018', name: 'Hira Nadeem', phone: '0321-4455667', totalRides: 56, status: 'Active' },
-  ]);
+  const [passengers, setPassengers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // New states for the UI fixes
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedPassenger, setSelectedPassenger] = useState(null);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const fetchPassengers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await api.get('/staff/passengers');
+        
+        const rawPassengers = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data.passengers || response.data.data || []);
+
+        const mappedPassengers = rawPassengers.map(p => ({
+          id: `#PSG-${p.id ?? p.passengerId ?? p.user_id ?? '???'}`,
+          name: String(p.name || p.username || p.passenger || 'Unknown'),
+          phone: String(p.phone || p.phoneNumber || p.contact || 'N/A'),
+          totalRides: p.totalRides || p.total_trips || p.trips || 0,
+          status: String(p.status || p.state || 'Active')
+        }));
+
+        setPassengers(mappedPassengers);
+      } catch (err) {
+        console.error("Error fetching passengers:", err);
+        setError("Failed to load passenger data. Please check your connection.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPassengers();
+  }, []);
+
+  const filteredPassengers = passengers.filter((p) => {
+    const matchesSearch = 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.phone.includes(searchTerm) ||
+      p.id.toLowerCase().includes(searchTerm.toLowerCase());
+      
+    const matchesStatus = filterStatus === 'All' || p.status === filterStatus;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const totalPages = Math.ceil(filteredPassengers.length / itemsPerPage) || 1;
+  const paginatedPassengers = filteredPassengers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (e, pageNumber) => {
+    e.preventDefault();
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+    }
+  };
 
   return (
     <div>
+      {error && (
+        <div className="alert alert-danger mb-4" role="alert">
+          {error}
+        </div>
+      )}
+
+      {/* Passenger Details Modal */}
+      {selectedPassenger && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-bottom-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark">Passenger Details</h5>
+                <button type="button" className="btn-close" onClick={() => setSelectedPassenger(null)}></button>
+              </div>
+              <div className="modal-body py-4">
+                <div className="d-flex align-items-center mb-4">
+                  <div className="rounded-circle bg-primary bg-opacity-10 d-flex justify-content-center align-items-center me-3 text-primary" style={{ width: '64px', height: '64px', fontSize: '1.5rem' }}>
+                    {selectedPassenger.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h5 className="mb-0 fw-bold text-dark">{selectedPassenger.name}</h5>
+                    <span className="text-muted fw-medium">{selectedPassenger.id}</span>
+                  </div>
+                </div>
+                
+                <div className="row g-3">
+                  <div className="col-6">
+                    <div className="p-3 bg-light rounded-3 h-100">
+                      <small className="text-muted d-block mb-1 fw-semibold">Phone Number</small>
+                      <span className="fw-bold text-dark">{selectedPassenger.phone}</span>
+                    </div>
+                  </div>
+                  <div className="col-6">
+                    <div className="p-3 bg-light rounded-3 h-100">
+                      <small className="text-muted d-block mb-1 fw-semibold">Total Rides</small>
+                      <span className="fw-bold text-dark">{selectedPassenger.totalRides}</span>
+                    </div>
+                  </div>
+                  <div className="col-12">
+                    <div className="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center">
+                      <small className="text-muted fw-semibold">Account Status</small>
+                      <span className="badge bg-success rounded-pill px-3 py-2 fw-medium">{selectedPassenger.status}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer border-top-0 pt-0">
+                <button type="button" className="btn btn-secondary rounded-3 px-4 fw-medium" onClick={() => setSelectedPassenger(null)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="row mb-4">
         <div className="col-md-8 col-lg-6 mb-3 mb-md-0">
@@ -20,13 +146,55 @@ const PassengerManagement = () => {
             type="text"
             className="form-control"
             placeholder="Search by name, phone, or ID..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1); 
+            }}
+            disabled={loading}
           />
         </div>
         <div className="col-md-4 col-lg-3">
-          <select className="form-select">
-            <option value="All">All</option>
-            <option value="Active">Active</option>
-          </select>
+          {/* Custom Bootstrap Dropdown replacing the native <select> */}
+          <div className="dropdown" ref={dropdownRef}>
+            <button 
+              className="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center bg-white" 
+              type="button" 
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              disabled={loading}
+            >
+              <span>{filterStatus === 'All' ? 'All Passengers' : 'Active Passengers'}</span>
+              <span className="dropdown-toggle"></span>
+            </button>
+            {isDropdownOpen && (
+              <ul className="dropdown-menu show w-100 shadow-sm border-0 mt-1" style={{ position: 'absolute', zIndex: 1000 }}>
+                <li>
+                  <button 
+                    className={`dropdown-item py-2 ${filterStatus === 'All' ? 'active bg-primary text-white' : ''}`} 
+                    onClick={() => {
+                      setFilterStatus('All');
+                      setCurrentPage(1);
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    All Passengers
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    className={`dropdown-item py-2 ${filterStatus === 'Active' ? 'active bg-primary text-white' : ''}`} 
+                    onClick={() => {
+                      setFilterStatus('Active');
+                      setCurrentPage(1);
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    Active Passengers
+                  </button>
+                </li>
+              </ul>
+            )}
+          </div>
         </div>
       </div>
 
@@ -45,27 +213,47 @@ const PassengerManagement = () => {
                 </tr>
               </thead>
               <tbody>
-                {passengers.map((passenger, index) => (
-                  <tr key={index}>
-                    <td className="ps-4 py-3 fw-medium text-secondary">{passenger.id}</td>
-                    <td className="py-3 text-dark">{passenger.name}</td>
-                    <td className="py-3 text-dark">{passenger.phone}</td>
-                    <td className="py-3 text-dark">{passenger.totalRides}</td>
-                    <td className="py-3">
-                      <span
-                        className="badge rounded-pill bg-success px-3 py-2 fw-medium"
-                        style={{ minWidth: '80px' }}
-                      >
-                        {passenger.status}
-                      </span>
-                    </td>
-                    <td className="pe-4 py-3">
-                      <div className="d-flex gap-2">
-                        <button className="btn btn-sm btn-outline-primary fw-medium">View</button>
-                      </div>
+                {loading ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-4 text-muted">
+                      <div className="spinner-border spinner-border-sm me-2" role="status"></div>
+                      Loading passenger data...
                     </td>
                   </tr>
-                ))}
+                ) : paginatedPassengers.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-4 text-muted">
+                      No passengers found matching your criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedPassengers.map((passenger, index) => (
+                    <tr key={index}>
+                      <td className="ps-4 py-3 fw-medium text-secondary">{passenger.id}</td>
+                      <td className="py-3 text-dark">{passenger.name}</td>
+                      <td className="py-3 text-dark">{passenger.phone}</td>
+                      <td className="py-3 text-dark">{passenger.totalRides}</td>
+                      <td className="py-3">
+                        <span
+                          className="badge rounded-pill bg-success px-3 py-2 fw-medium"
+                          style={{ minWidth: '80px' }}
+                        >
+                          {passenger.status}
+                        </span>
+                      </td>
+                      <td className="pe-4 py-3">
+                        <div className="d-flex gap-2">
+                          <button 
+                            className="btn btn-sm btn-outline-primary fw-medium"
+                            onClick={() => setSelectedPassenger(passenger)}
+                          >
+                            View
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -74,16 +262,39 @@ const PassengerManagement = () => {
 
       <nav aria-label="Passenger pagination">
         <ul className="pagination justify-content-end mb-0">
-          <li className="page-item disabled">
-            <a className="page-link" href="#" tabIndex="-1" aria-disabled="true">Previous</a>
+          <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+            <a 
+              className="page-link" 
+              href="#" 
+              onClick={(e) => handlePageChange(e, currentPage - 1)}
+              tabIndex="-1" 
+              aria-disabled={currentPage === 1}
+            >
+              Previous
+            </a>
           </li>
-          <li className="page-item active" aria-current="page">
-            <a className="page-link" href="#">1</a>
-          </li>
-          <li className="page-item"><a className="page-link" href="#">2</a></li>
-          <li className="page-item"><a className="page-link" href="#">3</a></li>
-          <li className="page-item">
-            <a className="page-link" href="#">Next</a>
+          
+          {[...Array(totalPages)].map((_, i) => (
+            <li key={i} className={`page-item ${currentPage === i + 1 ? 'active' : ''}`}>
+              <a 
+                className="page-link" 
+                href="#"
+                onClick={(e) => handlePageChange(e, i + 1)}
+              >
+                {i + 1}
+              </a>
+            </li>
+          ))}
+
+          <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+            <a 
+              className="page-link" 
+              href="#"
+              onClick={(e) => handlePageChange(e, currentPage + 1)}
+              aria-disabled={currentPage === totalPages}
+            >
+              Next
+            </a>
           </li>
         </ul>
       </nav>
