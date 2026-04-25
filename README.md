@@ -10,9 +10,9 @@ A ride hailing application that connects drivers with passengers with features l
 *Deployment*: Google Cloud Hosting, Kubernetes
 
 ## Features and Details
-Safar consists of 3 applications: a driver app, a passenger app and an admin panel.
-This project features a fully asynchronous backend. All API calls are handled asynchronously. Database connections are taken by service handlers from a connection pool when needed, and returned once the job is complete. Database queries are also executed asynchronously.
-This application also implements session handling; a user is signed out of the platform after 1 hour of signing in, and services cannot be accessed without a valid session key. This is done in order to prevent unauthorized access to data.
+Safar consists of 3 applications: a driver app, a passenger app and an admin panel.<br>
+This project features a fully asynchronous backend. All API calls are handled asynchronously. Database connections are taken by service handlers from a connection pool when needed, and returned once the job is complete. Database queries are also executed asynchronously.<br>
+This application also implements session handling; a user is signed out of the platform after 1 hour of signing in, and services cannot be accessed without a valid session key. This is done in order to prevent unauthorized access to data.<br>
 Safar features Google maps API integration for location fetching and tracking, to provide a simple and intuitive experience to users.
 
 
