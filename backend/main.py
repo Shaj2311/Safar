@@ -58,4 +58,4 @@ async def shutdown():
 
 @app.get("/")
 async def root():
-    return {"Welcome": "Welcome to Safar!"}
+    return {"Welcome": "Welcome to Safar! :)"}
