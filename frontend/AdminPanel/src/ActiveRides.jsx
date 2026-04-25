@@ -41,19 +41,6 @@ const ActiveRides = () => {
         </div>
       </div>
 
-      <div className="card shadow-sm border-0 rounded-3 mb-4">
-        <div className="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
-          <h5 className="fw-semibold text-dark mb-0">Live Fleet Map</h5>
-        </div>
-        <div className="card-body p-4">
-          <div
-            className="w-100 rounded d-flex align-items-center justify-content-center text-muted"
-            style={{ height: '300px', backgroundColor: '#f8f9fa', border: '2px dashed #dee2e6' }}
-          >
-            <p className="mb-0 fw-medium fs-5">Live Fleet Map Integration Pending</p>
-          </div>
-        </div>
-      </div>
 
       <div className="card shadow-sm border-0 rounded-3 mb-4">
         <div className="card-body p-0">
