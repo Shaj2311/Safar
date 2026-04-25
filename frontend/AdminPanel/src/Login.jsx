@@ -23,13 +23,18 @@ const Login = ({ onLogin }) => {
         password
       });
 
-      // The backend will return the session key. Since the schema is empty in docs, 
-      // we check a few common property names. We'll log it if we can't find it.
-      const token = response.data.sessionKey || response.data.access_token || response.data.token || response.data;
+      // The backend will return the session key.
+      const token = response.data.sessionKey || response.data.access_token || response.data.token || response.data.data?.sessionKey;
+      
+      // Capture profile details (defensive check for various property names)
+      const adminName = response.data.name || response.data.username || name;
+      const adminRole = response.data.role || response.data.type || 'admin';
       
       // Basic check to make sure token is a string/valid and not an empty object
       if (token && typeof token === 'string') {
         localStorage.setItem('safar_admin_token', token);
+        localStorage.setItem('safar_admin_name', adminName);
+        localStorage.setItem('safar_admin_role', adminRole);
         onLogin();
       } else {
         console.warn("Login payload received:", response.data);
