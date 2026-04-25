@@ -1,116 +1,160 @@
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { GoogleMap, Marker, DirectionsRenderer } from '@react-google-maps/api';
 
-// Fix Leaflet's default icon paths issue in React
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
 
-// Component to dynamically adjust map view when locations change
-const MapController = ({ pickup, dropoff, currentLocation }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (pickup && dropoff) {
-      const bounds = L.latLngBounds([pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]);
-      map.fitBounds(bounds, { padding: [50, 50] });
-    } else if (pickup) {
-      map.setView([pickup.lat, pickup.lng], 15);
-    } else if (currentLocation) {
-      map.setView([currentLocation.lat, currentLocation.lng], 14);
-    }
-  }, [pickup, dropoff, currentLocation, map]);
-  return null;
+// Default: Lahore center
+const DEFAULT_CENTER = { lat: 31.5204, lng: 74.3587 };
+
+const MAP_OPTIONS = {
+  disableDefaultUI: true,       // Hide all default Google controls
+  zoomControl: false,
+  streetViewControl: false,
+  mapTypeControl: false,
+  fullscreenControl: false,
 };
 
-export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff }) => {
+export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRouteCalculated }) => {
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [directions, setDirections] = useState(null);
+  const mapRef = useRef(null);
 
+  const onMapLoad = useCallback((map) => {
+    mapRef.current = map;
+  }, []);
+
+  // User ki current location detect karo
   useEffect(() => {
-    // Get user's physical location on load
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        setCurrentLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-      }, () => {
-        // Fallback to Lahore if denied
-        setCurrentLocation({ lat: 31.5204, lng: 74.3587 });
-      });
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => setCurrentLocation(DEFAULT_CENTER)
+      );
     } else {
-        setCurrentLocation({ lat: 31.5204, lng: 74.3587 });
+      setCurrentLocation(DEFAULT_CENTER);
     }
   }, []);
 
+  // Dono locations select hone ke baad directions fetch karo
   useEffect(() => {
-    // Draw route using OSRM Public API
-    const fetchRoute = async () => {
-      if (pickup && dropoff) {
-        try {
-          // OSRM Public API (Requires Longitude, Latitude order!)
-          const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${pickup.lng},${pickup.lat};${dropoff.lng},${dropoff.lat}?overview=full&geometries=geojson`);
-          const data = await response.json();
-          if (data.routes && data.routes.length > 0) {
-            // GeoJSON returns [lng, lat], but Leaflet expects [lat, lng]
-            const coords = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
-            setRouteCoordinates(coords);
+    if (!pickup || !dropoff || !window.google) {
+      setDirections(null);
+      return;
+    }
+
+    const directionsService = new window.google.maps.DirectionsService();
+    directionsService.route(
+      {
+        origin: { lat: pickup.lat, lng: pickup.lng },
+        destination: { lat: dropoff.lat, lng: dropoff.lng },
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === 'OK' && result) {
+          setDirections(result);
+
+          // Fare calculate karo: distance (meters) / 1000 = km, then * 100
+          if (onRouteCalculated) {
+            const distanceMeters = result.routes[0].legs[0].distance.value;
+            const distanceKm = distanceMeters / 1000;
+            const fare = Math.ceil(distanceKm * 100);
+            onRouteCalculated(fare);
           }
-        } catch (error) {
-          console.error("Failed to fetch route", error);
+
+          // Map ko route ke ird gird fit karo
+          if (mapRef.current) {
+            const bounds = new window.google.maps.LatLngBounds();
+            bounds.extend({ lat: pickup.lat, lng: pickup.lng });
+            bounds.extend({ lat: dropoff.lat, lng: dropoff.lng });
+            mapRef.current.fitBounds(bounds, { top: 80, bottom: 300, left: 40, right: 40 });
+          }
+        } else {
+          console.error('Directions failed:', status);
+          setDirections(null);
         }
-      } else {
-        setRouteCoordinates([]);
       }
-    };
-    fetchRoute();
+    );
+  }, [pickup, dropoff, onRouteCalculated]);
+
+  // Jab sirf pickup select hova ho toh map us pe center karo
+  useEffect(() => {
+    if (mapRef.current && pickup && !dropoff) {
+      mapRef.current.panTo({ lat: pickup.lat, lng: pickup.lng });
+      mapRef.current.setZoom(15);
+    }
   }, [pickup, dropoff]);
 
-  if (!currentLocation && !pickup && !dropoff) {
-    return <div className="w-100 h-100 d-flex align-items-center justify-content-center text-dark bg-light">Detecting Location...</div>;
-  }
-
-  const center = pickup ? [pickup.lat, pickup.lng] : currentLocation ? [currentLocation.lat, currentLocation.lng] : [31.5204, 74.3587];
+  const center = pickup
+    ? { lat: pickup.lat, lng: pickup.lng }
+    : currentLocation || DEFAULT_CENTER;
 
   return (
     <div className="map-placeholder w-100 h-100 d-flex flex-column position-relative">
-      {/* Hamburger Menu Overlay */}
-      <div 
-        onClick={onMenuClick} 
-        style={{ cursor: 'pointer', zIndex: 1000, position: 'absolute', top: '20px', left: '20px' }}
+      {/* Hamburger Menu — sabse upar, map ke upar */}
+      <div
+        onClick={onMenuClick}
+        style={{ cursor: 'pointer', zIndex: 9999, position: 'absolute', top: '20px', left: '20px' }}
       >
-        <div className="bg-white rounded-circle shadow d-flex align-items-center justify-content-center" style={{ width: '45px', height: '45px' }}>
+        <div
+          className="bg-white rounded-circle shadow d-flex align-items-center justify-content-center"
+          style={{ width: '45px', height: '45px' }}
+        >
           <i className="bi bi-list fs-3 text-dark"></i>
         </div>
       </div>
-      
-      {/* Actual React-Leaflet OpenStreetMap */}
+
+      {/* Google Map full screen */}
       <div className="position-absolute w-100 h-100 top-0 start-0" style={{ zIndex: 1 }}>
-        <MapContainer center={center} zoom={14} style={{ height: '100%', width: '100%' }} zoomControl={false}>
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapController pickup={pickup} dropoff={dropoff} currentLocation={currentLocation} />
-          
-          {currentLocation && !pickup && !dropoff && (
-            <Marker position={[currentLocation.lat, currentLocation.lng]} />
+        <GoogleMap
+          mapContainerStyle={MAP_CONTAINER_STYLE}
+          center={center}
+          zoom={14}
+          options={MAP_OPTIONS}
+          onLoad={onMapLoad}
+        >
+          {/* Current location marker (jab koi selection nahi) */}
+          {currentLocation && !pickup && (
+            <Marker position={currentLocation} />
           )}
-          {pickup && <Marker position={[pickup.lat, pickup.lng]} />}
-          {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} />}
-          
-          {routeCoordinates.length > 0 && (
-            <Polyline positions={routeCoordinates} color="#2B3445" weight={5} opacity={0.8} />
+
+          {/* Pickup marker */}
+          {pickup && (
+            <Marker
+              position={{ lat: pickup.lat, lng: pickup.lng }}
+              icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png' }}
+            />
           )}
-        </MapContainer>
+
+          {/* Dropoff marker */}
+          {dropoff && (
+            <Marker
+              position={{ lat: dropoff.lat, lng: dropoff.lng }}
+              icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png' }}
+            />
+          )}
+
+          {/* Route line */}
+          {directions && (
+            <DirectionsRenderer
+              directions={directions}
+              options={{
+                suppressMarkers: true, // Humhare custom markers use karo
+                polylineOptions: {
+                  strokeColor: '#2B3445',
+                  strokeWeight: 5,
+                  strokeOpacity: 0.85,
+                },
+              }}
+            />
+          )}
+        </GoogleMap>
       </div>
 
-      {/* Children elements (Bottom UI Sheets) */}
-      <div className="position-relative w-100 h-100 d-flex flex-column justify-content-end pointer-events-none" style={{ zIndex: 1000 }}>
+      {/* Bottom UI children (drawers, buttons) */}
+      <div
+        className="position-relative w-100 h-100 d-flex flex-column justify-content-end"
+        style={{ zIndex: 1000, pointerEvents: 'none' }}
+      >
         <div style={{ pointerEvents: 'auto' }}>
           {children}
         </div>

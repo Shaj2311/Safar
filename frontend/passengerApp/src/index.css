@@ -94,7 +94,7 @@ html, body, #root {
 
 .map-placeholder {
   flex-grow: 1;
-  background-color: #d2e4d6; /* Light green-gray map background */
+  background-color: #d2e4d6;
   display: flex;
   justify-content: center;
   align-items: center;
