@@ -6,7 +6,7 @@ const Dashboard = () => {
     totalRides: 0,
     activeCaptains: 0,
     totalPassengers: 0,
-    todaysRevenue: 0,
+    supportTickets: 0,
   });
   
   const [loading, setLoading] = useState(true);
@@ -22,30 +22,34 @@ const Dashboard = () => {
   ]);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchDashboardData = async () => {
       try {
         setLoading(true);
         setError(null);
-        // api.js handles appending the base URL and safar_admin_token automatically
-        const response = await api.get('/super/stats');
         
-        // Mapping backend response to our UI state.
-        // We fallback to 0 if certain fields (like revenue) are missing from the stats payload
+        // Fetch stats, passengers, and tickets concurrently to save time
+        const [statsRes, passengersRes, ticketsRes] = await Promise.all([
+          api.get('/super/stats'),
+          api.get('/staff/passengers'),
+          api.get('/staff/tickets')
+        ]);
+        
         setKpis({
-          totalRides: response.data.total_trips || 0,
-          activeCaptains: response.data.active_drivers || 0,
-          totalPassengers: response.data.total_passengers || 0, 
-          todaysRevenue: response.data.todays_revenue || 0, 
+          totalRides: statsRes.data.total_trips || 0,
+          activeCaptains: statsRes.data.active_drivers || 0,
+          // Calculate totals based on array length
+          totalPassengers: passengersRes.data.length || 0, 
+          supportTickets: ticketsRes.data.length || 0, 
         });
       } catch (err) {
-        console.error("Error fetching dashboard stats:", err);
+        console.error("Error fetching dashboard data:", err);
         setError("Failed to load dashboard metrics. Please check your connection.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStats();
+    fetchDashboardData();
   }, []);
 
   const getBadgeClass = (status) => {
@@ -76,7 +80,6 @@ const Dashboard = () => {
               <h3 className="card-title fw-bold mb-1">
                 {loading ? '...' : kpis.totalRides.toLocaleString()}
               </h3>
-              <small className="text-success fw-medium">+8% this week</small>
             </div>
           </div>
         </div>
@@ -84,13 +87,12 @@ const Dashboard = () => {
           <div className="card shadow-sm h-100 border-0 rounded-3">
             <div className="card-body p-4">
               <div className="d-flex justify-content-between align-items-start mb-2">
-                <h6 className="card-subtitle text-muted mb-0">Today's Revenue</h6>
-                <span className="text-secondary fs-5">💰</span>
+                <h6 className="card-subtitle text-muted mb-0">Support Tickets</h6>
+                <span className="text-secondary fs-5">🎫</span>
               </div>
               <h3 className="card-title fw-bold mb-1">
-                {loading ? '...' : `Rs. ${kpis.todaysRevenue.toLocaleString()}`}
+                {loading ? '...' : kpis.supportTickets.toLocaleString()}
               </h3>
-              <small className="text-success fw-medium">+12% this week</small>
             </div>
           </div>
         </div>
@@ -104,7 +106,6 @@ const Dashboard = () => {
               <h3 className="card-title fw-bold mb-1">
                 {loading ? '...' : kpis.activeCaptains}
               </h3>
-              <small className="text-success fw-medium">+2% this week</small>
             </div>
           </div>
         </div>
@@ -113,12 +114,11 @@ const Dashboard = () => {
             <div className="card-body p-4">
               <div className="d-flex justify-content-between align-items-start mb-2">
                 <h6 className="card-subtitle text-muted mb-0">Total Passengers</h6>
-                <span className="text-secondary fs-5">👤</span>
+                <span className="text-secondary fs-5">👥</span>
               </div>
               <h3 className="card-title fw-bold mb-1">
                 {loading ? '...' : kpis.totalPassengers.toLocaleString()}
               </h3>
-              <small className="text-success fw-medium">+15% this week</small>
             </div>
           </div>
         </div>

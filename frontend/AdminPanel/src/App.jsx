@@ -45,11 +45,6 @@ function App() {
   });
 
   const handleLogin = () => {
-    // Note: The actual token should be set by Login.jsx upon a successful API response.
-    // We'll set a dummy token here just to test the layout flow until Login is wired up.
-    if (!localStorage.getItem('safar_admin_token')) {
-      localStorage.setItem('safar_admin_token', 'dummy_token_123');
-    }
     setIsAuthenticated(true);
   };
   const handleLogout = () => {
