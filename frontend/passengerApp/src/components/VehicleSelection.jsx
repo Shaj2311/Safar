@@ -14,25 +14,20 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
 
   const handleConfirmRide = async () => {
     if (!activeVehicle || !pickup || !dropoff) return;
-    
+
     setLoading(true);
     try {
-      // Ab real map coordinates send kar rahe hain backend ko!
       const response = await createRideRequest({
         pickup_x: pickup.lat,
         pickup_y: pickup.lng,
         dropoff_x: dropoff.lat,
         dropoff_y: dropoff.lng
       });
-      
-      if (response && response.tripId) {
-        setCurrentRideId(response.tripId);
-      } else if (response && response.id) {
-        setCurrentRideId(response.id);
-      } else if (response && response.ride_id) {
-        setCurrentRideId(response.ride_id);
-      }
-      
+
+      const rideId = response?.rideId || response?.tripId || response?.id || response?.ride_id || null;
+      console.log('Ride created. ID:', rideId, '| Full response:', response);
+      if (rideId) setCurrentRideId(rideId);
+
       setLoading(false);
       setCurrentScreen('searching');
     } catch (error) {
@@ -48,38 +43,38 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
         <div className="text-center py-4 fs-4 fw-bold bg-white" style={{ borderTopLeftRadius: '30px', borderTopRightRadius: '30px' }}>
           Choose a ride
         </div>
-        
+
         <div className="bg-light py-2">
-            {options.map(option => (
-              <div 
-                key={option.id}
-                className="drawer-item px-4 mx-3 my-2 bg-light rounded shadow-sm"
-                style={{ 
-                  cursor: 'pointer', 
-                  border: activeVehicle === option.id ? '3px solid #80CCA5' : '3px solid transparent',
-                  padding: '15px 0',
-                  transition: '0.2s all'
-                }}
-                onClick={() => setActiveVehicle(option.id)}
-              >
-                <div className="d-flex align-items-center">
-                    <i className={`${option.icon} fs-1 me-4 ${activeVehicle === option.id ? 'text-dark' : 'text-secondary'}`}></i>
-                    <span className="drawer-item-title fw-bold fs-5">{option.name}</span>
-                </div>
-                <span className="drawer-item-price fw-bold fs-5 text-success">{option.price}</span>
+          {options.map(option => (
+            <div
+              key={option.id}
+              className="drawer-item px-4 mx-3 my-2 bg-light rounded shadow-sm"
+              style={{
+                cursor: 'pointer',
+                border: activeVehicle === option.id ? '3px solid #80CCA5' : '3px solid transparent',
+                padding: '15px 0',
+                transition: '0.2s all'
+              }}
+              onClick={() => setActiveVehicle(option.id)}
+            >
+              <div className="d-flex align-items-center">
+                <i className={`${option.icon} fs-1 me-4 ${activeVehicle === option.id ? 'text-dark' : 'text-secondary'}`}></i>
+                <span className="drawer-item-title fw-bold fs-5">{option.name}</span>
               </div>
-            ))}
+              <span className="drawer-item-price fw-bold fs-5 text-success">{option.price}</span>
+            </div>
+          ))}
         </div>
 
         <div className="p-4 bg-white">
-            <button 
-              className="btn w-100 rounded-pill py-3 fw-bold fs-5 text-white"
-              onClick={handleConfirmRide}
-              disabled={!activeVehicle || loading}
-              style={{ backgroundColor: '#80CCA5', opacity: activeVehicle && !loading ? 1 : 0.5 }}
-            >
-              {loading ? 'Requesting...' : 'Confirm Ride'}
-            </button>
+          <button
+            className="btn w-100 rounded-pill py-3 fw-bold fs-5 text-white"
+            onClick={handleConfirmRide}
+            disabled={!activeVehicle || loading}
+            style={{ backgroundColor: '#80CCA5', opacity: activeVehicle && !loading ? 1 : 0.5 }}
+          >
+            {loading ? 'Requesting...' : 'Confirm Ride'}
+          </button>
         </div>
       </div>
     </MapPlaceholder>

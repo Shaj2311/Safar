@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLoadScript } from '@react-google-maps/api';
 import { Login } from './components/Login';
 import { Home } from './components/Home';
 import { VehicleSelection } from './components/VehicleSelection';
@@ -10,14 +11,32 @@ import { Sidebar } from './components/Sidebar';
 import { History } from './components/History';
 import { Settings } from './components/Settings';
 
+const LIBRARIES = ['places', 'geometry'];
+
 function App() {
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries: LIBRARIES,
+  });
+
   const [currentScreen, setCurrentScreen] = useState('login');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentRideId, setCurrentRideId] = useState(null);
-  
+
   // Lifted state for mapping and routing
   const [pickup, setPickup] = useState(null);
   const [dropoff, setDropoff] = useState(null);
+
+  if (!isLoaded) {
+    return (
+      <div className="mobile-container d-flex align-items-center justify-content-center">
+        <div className="text-center">
+          <div className="spinner-border text-success mb-3" role="status"></div>
+          <p className="text-muted">Loading Safar...</p>
+        </div>
+      </div>
+    );
+  }
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -53,7 +72,7 @@ function App() {
           <i className="bi bi-battery-full"></i>
         </span>
       </div>
-      
+
       {renderScreen()}
 
       {isSidebarOpen && (
