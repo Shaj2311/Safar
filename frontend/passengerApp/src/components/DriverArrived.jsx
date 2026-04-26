@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPlaceholder } from './MapPlaceholder';
-import { getRideStatus, getDriverProfileByAnyId, getRideDetailsByAnyEndpoint } from '../services/api';
+import { getRideStatus, getDriverProfileByAnyId, getRideDetailsByAnyEndpoint, getRideDriverDetails } from '../services/api';
 
 const normalizeKey = (key) => String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -355,7 +355,9 @@ const extractEtaText = (source) => {
     'minutes_away',
     'minutesAway',
     'duration_text',
-    'durationText'
+    'durationText',
+    'remaining_time',
+    'remainingTime'
   ])
     || findValueByKeyHints(source, ['eta'])
     || findValueByKeyHints(source, ['arrival', 'time']);
@@ -399,7 +401,7 @@ const mapDriverFromSource = (source) => {
   const name = findFirstValueByKeyNames(source, ['driver_name', 'driverName', 'driver_full_name', 'driverFullName'])
     || findValueByKeyHints(source, ['driver', 'name']);
 
-  const phone = findFirstValueByKeyNames(source, ['driver_phone', 'driverPhone'])
+  const phone = findFirstValueByKeyNames(source, ['driver_phone', 'driverPhone', 'phone_no', 'phoneNo'])
     || findValueByKeyHints(source, ['driver', 'phone']);
 
   const vehicleMake = findFirstValueByKeyNames(source, ['vehicle_make', 'vehicleMake', 'car_make', 'carMake', 'make'])
@@ -483,6 +485,16 @@ export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId }) 
         const currentStatus = data.Status || data.status;
         const normalizedStatus = normalizeStatusValue(currentStatus);
         let nextEtaText = extractEtaText(data);
+
+        // Fetch dedicated driver and vehicle details using the new SAF-148 API
+        try {
+          const dedicatedDriverData = await getRideDriverDetails(currentRideId);
+          if (dedicatedDriverData && isMounted) {
+            setDriver(prev => normalizeDriverData(prev, dedicatedDriverData));
+          }
+        } catch (driverError) {
+          console.warn("Dedicated driver fetch failed, falling back to status-based extraction:", driverError);
+        }
 
         if (isMounted) {
           setRideStatusText(normalizedStatus);
