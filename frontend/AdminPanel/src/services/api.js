@@ -7,7 +7,7 @@ const api = axios.create({
 // attaches sessionKey to every request automatically
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('safar_admin_token');
+    const token = sessionStorage.getItem('safar_admin_token');
     if (token) {
       config.params = { ...config.params, sessionKey: token };
     }

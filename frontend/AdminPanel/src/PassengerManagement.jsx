@@ -102,7 +102,7 @@ const PassengerManagement = () => {
     setActionError(null);
     setActionSuccess(null);
     try {
-      const role = localStorage.getItem('safar_admin_role') || 'admin';
+      const role = sessionStorage.getItem('safar_admin_role') || 'admin';
       // super admin uses a different hard-delete route
       const endpoint = role === 'super' || role === 'super_admin'
         ? `/super/passengers/${selectedPassenger.rawId}`

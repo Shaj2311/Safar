@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import api from './services/api';
 
 const SupportTickets = () => {
+  const location = useLocation();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11,6 +13,11 @@ const SupportTickets = () => {
   const itemsPerPage = 10;
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({ trip_id: '', content: '' });
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState(null);
+  const [createSuccess, setCreateSuccess] = useState(null);
   const dropdownRef = useRef(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
@@ -69,6 +76,15 @@ const SupportTickets = () => {
     fetchTickets();
   }, [fetchTickets]);
 
+  useEffect(() => {
+    if (location.state?.prefillTripId) {
+      setCreateForm(prev => ({ ...prev, trip_id: location.state.prefillTripId }));
+      setShowCreateModal(true);
+      // clear state so it doesn't reopen on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   const handleCloseModal = () => {
     setSelectedTicket(null);
     setActionError(null);
@@ -90,6 +106,37 @@ const SupportTickets = () => {
       setActionError(err.response?.data?.detail || 'Failed to resolve ticket.');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleCreateTicket = async (e) => {
+    e.preventDefault();
+    const staffId = sessionStorage.getItem('safar_staff_id');
+    if (!staffId) {
+      setCreateError("Could not find your staff ID. Please try logging in again.");
+      return;
+    }
+
+    setCreateLoading(true);
+    setCreateError(null);
+    setCreateSuccess(null);
+    try {
+      await api.post('/support/tickets', {
+        trip_id: parseInt(createForm.trip_id),
+        staff_id: parseInt(staffId),
+        content: createForm.content
+      });
+      setCreateSuccess('Ticket created successfully!');
+      fetchTickets();
+      setTimeout(() => {
+        setShowCreateModal(false);
+        setCreateForm({ trip_id: '', content: '' });
+        setCreateSuccess(null);
+      }, 1500);
+    } catch (err) {
+      setCreateError(err.response?.data?.detail || 'Failed to create ticket.');
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -348,7 +395,66 @@ const SupportTickets = () => {
             )}
           </div>
         </div>
+
+        <div className="col-md-3 col-lg-3 text-md-end">
+          <button
+            className="btn btn-primary fw-medium"
+            onClick={() => setShowCreateModal(true)}
+          >
+            + Create Ticket
+          </button>
+        </div>
       </div>
+
+      {/* Create Ticket Modal */}
+      {showCreateModal && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-bottom-0 pb-0">
+                <h5 className="modal-title fw-bold">Create New Support Ticket</h5>
+                <button type="button" className="btn-close" onClick={() => setShowCreateModal(false)} disabled={createLoading}></button>
+              </div>
+              <form onSubmit={handleCreateTicket}>
+                <div className="modal-body py-3">
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold small">Trip ID</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      placeholder="e.g. 125"
+                      value={createForm.trip_id}
+                      onChange={(e) => setCreateForm({ ...createForm, trip_id: e.target.value })}
+                      required
+                      disabled={createLoading}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold small">Complaint Details</label>
+                    <textarea
+                      className="form-control"
+                      rows="4"
+                      placeholder="Describe the issue..."
+                      value={createForm.content}
+                      onChange={(e) => setCreateForm({ ...createForm, content: e.target.value })}
+                      required
+                      disabled={createLoading}
+                    ></textarea>
+                  </div>
+                  {createError && <div className="alert alert-danger py-2">{createError}</div>}
+                  {createSuccess && <div className="alert alert-success py-2">{createSuccess}</div>}
+                </div>
+                <div className="modal-footer border-top pt-2">
+                  <button type="button" className="btn btn-outline-secondary" onClick={() => setShowCreateModal(false)} disabled={createLoading}>Cancel</button>
+                  <button type="submit" className="btn btn-primary px-4" disabled={createLoading}>
+                    {createLoading ? 'Creating...' : 'Submit Ticket'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card shadow-sm border-0 rounded-3 mb-4">
         <div className="card-body p-0">

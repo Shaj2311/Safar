@@ -123,7 +123,7 @@ const CaptainManagement = () => {
     setActionError(null);
     setActionSuccess(null);
     try {
-      const role = localStorage.getItem('safar_admin_role') || 'admin';
+      const role = sessionStorage.getItem('safar_admin_role') || 'admin';
       // Super Admin has a separate hard-delete endpoint
       const endpoint = role === 'super' || role === 'super_admin'
         ? `/super/drivers/${selectedCaptain.rawId}`
