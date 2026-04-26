@@ -23,11 +23,15 @@ const Login = ({ onLogin }) => {
       const token = response.data.sessionKey || response.data.access_token || response.data.token || response.data.data?.sessionKey;
       const adminName = response.data.name || response.data.username || name;
       const adminRole = response.data.role || response.data.type || 'admin';
+      const staffId = response.data.staff_id || response.data.id || response.data.userId || response.data.user_id;
       
       if (token && typeof token === 'string') {
-        localStorage.setItem('safar_admin_token', token);
-        localStorage.setItem('safar_admin_name', adminName);
-        localStorage.setItem('safar_admin_role', adminRole);
+        sessionStorage.setItem('safar_admin_token', token);
+        sessionStorage.setItem('safar_admin_name', adminName);
+        sessionStorage.setItem('safar_admin_role', adminRole);
+        if (staffId) {
+          sessionStorage.setItem('safar_staff_id', String(staffId));
+        }
         onLogin();
       } else {
         console.warn("Login payload received:", response.data);

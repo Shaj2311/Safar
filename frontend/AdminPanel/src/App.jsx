@@ -19,7 +19,7 @@ const pageTitles = {
 };
 
 const getRole = () => {
-  const role = localStorage.getItem('safar_admin_role') || 'support';
+  const role = sessionStorage.getItem('safar_admin_role') || 'support';
   return role.includes('super') ? 'super' : role;
 };
 
@@ -41,7 +41,7 @@ const Header = ({ onLogout }) => {
   const { pathname } = useLocation();
   const title = pageTitles[pathname] || 'Admin Panel';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const username = localStorage.getItem('safar_admin_name') || 'Admin User';
+  const username = sessionStorage.getItem('safar_admin_name') || 'Admin User';
   const role = getRole();
   const roleLabel = role === 'super' ? 'Super Admin' : role;
 
@@ -97,15 +97,15 @@ const Header = ({ onLogout }) => {
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('safar_admin_token') !== null;
+    return sessionStorage.getItem('safar_admin_token') !== null;
   });
 
   const handleLogin = () => setIsAuthenticated(true);
 
   const handleLogout = () => {
-    localStorage.removeItem('safar_admin_token');
-    localStorage.removeItem('safar_admin_name');
-    localStorage.removeItem('safar_admin_role');
+    sessionStorage.removeItem('safar_admin_token');
+    sessionStorage.removeItem('safar_admin_name');
+    sessionStorage.removeItem('safar_admin_role');
     setIsAuthenticated(false);
   };
 

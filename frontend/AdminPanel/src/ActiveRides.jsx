@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from './services/api';
 
 const ActiveRides = () => {
+  const navigate = useNavigate();
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,6 +41,7 @@ const ActiveRides = () => {
 
           return {
             id: `#TRP-${ride.tripId ?? ride.id ?? '???'}`,
+            rawId: ride.tripId ?? ride.id,
             passenger: (typeof ride.passenger === 'string' ? ride.passenger : ride.passenger?.name) || 'Unknown',
             captain: (typeof ride.driver === 'string' ? ride.driver : ride.driver?.name) || 'Unassigned',
             pickup: pickupStr,
@@ -256,12 +259,20 @@ const ActiveRides = () => {
                         {ride.fare > 0 ? `Rs. ${ride.fare}` : '—'}
                       </td>
                       <td className="pe-4 py-3">
-                        <button 
-                          className="btn btn-sm btn-outline-primary fw-medium"
-                          onClick={() => setSelectedRide(ride)}
-                        >
-                          View Details
-                        </button>
+                        <div className="d-flex gap-2">
+                          <button 
+                            className="btn btn-sm btn-outline-primary fw-medium"
+                            onClick={() => setSelectedRide(ride)}
+                          >
+                            View
+                          </button>
+                          <button 
+                            className="btn btn-sm btn-outline-warning fw-medium"
+                            onClick={() => navigate('/tickets', { state: { prefillTripId: ride.rawId } })}
+                          >
+                            Report
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

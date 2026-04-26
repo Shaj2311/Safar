@@ -17,7 +17,7 @@ const ALL_NAV_ITEMS = [
 ];
 
 const Sidebar = () => {
-  const role = localStorage.getItem('safar_admin_role') || 'support';
+  const role = sessionStorage.getItem('safar_admin_role') || 'support';
   // backend might send 'super_admin' so we normalise it
   const normalisedRole = role.includes('super') ? 'super' : role;
   const allowedKeys = ROLE_NAV[normalisedRole] || ROLE_NAV['support'];
