@@ -207,9 +207,9 @@ async def endRide(sessionKey: str, id: int, db = Depends(get_db)):
             raise HTTPException(status_code=404, detail="ride not found")
             
         dist = float(trip_data['estimated_dist']) if trip_data['estimated_dist'] else 0.0
-        base_fare = 100.0
-        dist_multiplier = 50.0
-        total_fare = base_fare + (dist * dist_multiplier)
+        base_fare = 0
+        dist_multiplier = 100
+        total_fare = dist * dist_multiplier
         
         # Auto-create payment entry
         pay_query = """
