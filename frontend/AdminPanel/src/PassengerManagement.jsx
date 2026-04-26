@@ -48,7 +48,6 @@ const PassengerManagement = () => {
         id: `#PSG-${p.id ?? p.passengerId ?? p.user_id ?? '???'}`,
         name: String(p.name || p.username || p.passenger || 'Unknown'),
         phone: String(p.phone || p.phoneNumber || p.contact || 'N/A'),
-        totalRides: p.totalRides || p.total_trips || p.trips || 0,
         status: String(p.status || p.state || 'Active')
       }));
 
@@ -261,7 +260,6 @@ const PassengerManagement = () => {
                   <th className="ps-4 py-3 text-muted fw-semibold border-bottom">Passenger ID</th>
                   <th className="py-3 text-muted fw-semibold border-bottom">Name</th>
                   <th className="py-3 text-muted fw-semibold border-bottom">Phone Number</th>
-                  <th className="py-3 text-muted fw-semibold border-bottom">Total Rides</th>
                   <th className="py-3 text-muted fw-semibold border-bottom">Status</th>
                   <th className="pe-4 py-3 text-muted fw-semibold border-bottom">Actions</th>
                 </tr>
@@ -286,7 +284,6 @@ const PassengerManagement = () => {
                       <td className="ps-4 py-3 fw-medium text-secondary">{passenger.id}</td>
                       <td className="py-3 text-dark">{passenger.name}</td>
                       <td className="py-3 text-dark">{passenger.phone}</td>
-                      <td className="py-3 text-dark">{passenger.totalRides}</td>
                       <td className="py-3">
                         <span
                           className="badge rounded-pill bg-success px-3 py-2 fw-medium"
