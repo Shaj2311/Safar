@@ -80,6 +80,37 @@ async def getRideStatus(sessionKey: str, id: int, db = Depends(get_db)):
     return {"Status": "Pending"}
 
 
+@router.get("/{tripId}/paymentStatus")
+async def getRidePaymentStatus(sessionKey: str, tripId: int, db = Depends(get_db)):
+    """Check if the payment for a specific ride has been settled. Validates ownership."""
+    passengerId = validate_session(sessionKey)
+
+    async with db.acquire() as conn:
+        query = """
+            select pay.is_paid, pay.actual_fare fare, pay.inserted_at processed_at
+            from payment pay
+            join trip t on pay.trip_id = t.trip_id
+            where t.trip_id = $1 
+            and t.passenger_id = $2 
+            and t.is_deleted = false
+        """
+        payment_info = await conn.fetchrow(query, tripId, passengerId)
+        
+        if not payment_info:
+            raise HTTPException(
+                status_code=404, 
+                detail="Payment information not found or access unauthorized"
+            )
+
+        print(payment_info)
+        return {
+            "tripId": tripId,
+            "isPaid": payment_info["is_paid"],
+            "fare": float(payment_info["fare"]),
+            "processedAt": str(payment_info["processed_at"])
+        }
+
+
 @router.patch("/{id}/accept")
 async def acceptRideRequest(sessionKey: str, id: int, db = Depends(get_db)):
     """Called by driver to accept ride request"""
