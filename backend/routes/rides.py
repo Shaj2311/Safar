@@ -18,8 +18,6 @@ async def requestRide(sessionKey: str, rideDetails: RideRequest, db = Depends(ge
         if not is_passenger:
             raise HTTPException(status_code=403, detail="only passengers can request rides")
 
-        # Placeholder for distance calculation
-        estimated_dist = 0.0 
 
         # Insert trip
         query = """
@@ -34,7 +32,7 @@ async def requestRide(sessionKey: str, rideDetails: RideRequest, db = Depends(ge
                 rideDetails.pickup_y, 
                 rideDetails.dropoff_x, 
                 rideDetails.dropoff_y, 
-                estimated_dist
+                rideDetails.dist
                 )
 
         return {"status": "Ride requested", "tripId": trip_id}
@@ -82,6 +80,37 @@ async def getRideStatus(sessionKey: str, id: int, db = Depends(get_db)):
     return {"Status": "Pending"}
 
 
+@router.get("/{tripId}/paymentStatus")
+async def getRidePaymentStatus(sessionKey: str, tripId: int, db = Depends(get_db)):
+    """Check if the payment for a specific ride has been settled. Validates ownership."""
+    passengerId = validate_session(sessionKey)
+
+    async with db.acquire() as conn:
+        query = """
+            select pay.is_paid, pay.actual_fare fare, pay.inserted_at processed_at
+            from payment pay
+            join trip t on pay.trip_id = t.trip_id
+            where t.trip_id = $1 
+            and t.passenger_id = $2 
+            and t.is_deleted = false
+        """
+        payment_info = await conn.fetchrow(query, tripId, passengerId)
+        
+        if not payment_info:
+            raise HTTPException(
+                status_code=404, 
+                detail="Payment information not found or access unauthorized"
+            )
+
+        print(payment_info)
+        return {
+            "tripId": tripId,
+            "isPaid": payment_info["is_paid"],
+            "fare": float(payment_info["fare"]),
+            "processedAt": str(payment_info["processed_at"])
+        }
+
+
 @router.patch("/{id}/accept")
 async def acceptRideRequest(sessionKey: str, id: int, db = Depends(get_db)):
     """Called by driver to accept ride request"""
@@ -94,11 +123,48 @@ async def acceptRideRequest(sessionKey: str, id: int, db = Depends(get_db)):
         if check is not None:
             raise HTTPException(status_code=410, detail="ride already accepted")
             
-        # Acceptance logic: link driver and auto-create chat
+        # link driver and auto-create chat
         await conn.execute("update trip set driver_id = $1, updated_at = now() where trip_id = $2", userId, id)
         await conn.execute("insert into chat (trip_id) values ($1)", id)
         
         return {"rideId": id, "status": "Accepted"}
+
+
+@router.get("/{tripId}/location")
+async def getRideLocation(sessionKey: str, tripId: int, db = Depends(get_db)):
+    """Polled by passenger to get the latest trip coordinates for map updates"""
+    passengerId = validate_session(sessionKey)
+
+    async with db.acquire() as conn:
+        query = """
+            select lh.location, lh.timestamp
+            from locationhistory lh
+            join trip t on lh.trip_id = t.trip_id
+            where t.trip_id = $1 
+            and t.passenger_id = $2 
+            and t.is_deleted = false
+            order by lh.timestamp desc
+            limit 1
+        """
+        loc_record = await conn.fetchrow(query, tripId, passengerId)
+        
+        if not loc_record:
+            raise HTTPException(
+                status_code=404, 
+                detail="Location data unavailable"
+            )
+
+        # convert coordinates
+        location = loc_record["location"]
+        
+        return {
+            "tripId": tripId,
+            "coords": {
+                "lat": location.x, 
+                "lng": location.y
+            },
+            "lastUpdated": str(loc_record["timestamp"])
+        }
 
 
 @router.post("/{id}/location")
@@ -168,6 +234,33 @@ async def confirmPayment(sessionKey: str, id: int, db = Depends(get_db)):
             raise HTTPException(status_code=404, detail="payment record not found")
             
         return {"id": id, "paymentStatus": "Paid"}
+
+
+@router.get("/{tripId}/driver")
+async def getCurrentDriver(sessionKey: str, tripId: int, db = Depends(get_db)):
+    """Called by passenger during an active/accepted ride to get driver and vehicle info"""
+    passengerId = validate_session(sessionKey)
+
+    async with db.acquire() as conn:
+        query = """
+            select u.name as driver_name, d.phone_no, v.make, v.model, v.plate_no
+            from trip t
+            join appuser u on t.driver_id = u.user_id
+            join driver d on t.driver_id = d.driver_id
+            left join vehicle v on d.driver_id = v.driver_id
+            where t.trip_id = $1
+            and t.passenger_id = $2
+            and t.is_deleted = false
+        """
+        driver_info = await conn.fetchrow(query, tripId, passengerId)
+        
+        if not driver_info:
+            raise HTTPException(
+                status_code=404, 
+                detail="Invalid ride or access unauthorized"
+            )
+
+        return dict(driver_info)
 
 
 @router.get("/{id}/summary")
