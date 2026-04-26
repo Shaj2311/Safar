@@ -388,3 +388,29 @@ export const getRideDriverDetails = async (tripId) => {
     }
 };
 
+export const getRidePaymentStatus = async (tripId) => {
+    try {
+        const sessionKey = localStorage.getItem('sessionKey');
+        if (!tripId) {
+            throw new Error('Trip id is required to fetch payment status');
+        }
+
+        if (!sessionKey) {
+            throw new Error('Session key is required to fetch payment status');
+        }
+
+        const url = new URL(`${BASE_URL}/rides/${tripId}/paymentStatus`, window.location.origin);
+        url.searchParams.append('sessionKey', sessionKey);
+
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+            throw new Error('Failed to fetch ride payment status');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("API Error: getRidePaymentStatus", error);
+        throw error;
+    }
+};
+

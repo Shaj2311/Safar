@@ -1,18 +1,122 @@
 import React, { useEffect, useState } from 'react';
 import { MapPlaceholder } from './MapPlaceholder';
-import { getRideStatus, getRideSummary, getRideDetailsByAnyEndpoint } from '../services/api';
+import { getRideSummary, getRideDetailsByAnyEndpoint, getRidePaymentStatus } from '../services/api';
 
 const normalizeStatusValue = (status) => String(status || '').trim().toLowerCase().replace(/\s+/g, '_');
 
-const isPaymentConfirmedStatus = (status) => {
+const normalizeKey = (key) => String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const findFirstValueByKeys = (source, keyNames) => {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const targetKeys = new Set(keyNames.map((key) => normalizeKey(key)));
+  const queue = [source];
+  const visited = new Set();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    if (!current || typeof current !== 'object') {
+      continue;
+    }
+
+    if (visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+
+    if (Array.isArray(current)) {
+      for (const item of current) {
+        queue.push(item);
+      }
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(current)) {
+      if (targetKeys.has(normalizeKey(key)) && value !== null && value !== undefined && String(value).trim() !== '') {
+        return value;
+      }
+
+      if (value && typeof value === 'object') {
+        queue.push(value);
+      }
+    }
+  }
+
+  return null;
+};
+
+const isConfirmedStatusValue = (status) => {
   const normalized = normalizeStatusValue(status);
   return [
     'paid',
     'payment_confirmed',
     'paymentconfirmed',
     'confirmed_payment',
-    'confirmedpayment'
+    'confirmedpayment',
+    'settled',
+    'payment_settled',
+    'paymentsettled',
+    'success',
   ].includes(normalized);
+};
+
+const isTruthyFlag = (value) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return value === 1;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = normalizeStatusValue(value);
+    return ['true', '1', 'yes'].includes(normalized);
+  }
+
+  return false;
+};
+
+const isPaymentSettled = (paymentPayload) => {
+  if (!paymentPayload || typeof paymentPayload !== 'object') {
+    return false;
+  }
+
+  const paidFlag = findFirstValueByKeys(paymentPayload, [
+    'is_paid',
+    'isPaid',
+    'paid',
+    'payment_paid',
+    'paymentPaid',
+    'is_settled',
+    'isSettled',
+    'payment_settled',
+    'paymentSettled',
+    'settled',
+  ]);
+
+  if (paidFlag !== null && paidFlag !== undefined) {
+    if (isTruthyFlag(paidFlag)) {
+      return true;
+    }
+
+    if (typeof paidFlag === 'string' && isConfirmedStatusValue(paidFlag)) {
+      return true;
+    }
+  }
+
+  const paymentStatus = findFirstValueByKeys(paymentPayload, [
+    'payment_status',
+    'paymentStatus',
+    'payment_state',
+    'paymentState',
+    'status',
+  ]);
+
+  return isConfirmedStatusValue(paymentStatus);
 };
 
 const extractFareValue = (payload) => {
@@ -108,22 +212,47 @@ export const TripCompleted = ({ setCurrentScreen, onMenuClick, currentRideId }) 
     if (!currentRideId) return;
 
     let isMounted = true;
-    const pollingInterval = setInterval(async () => {
+    let pollingInterval;
+
+    const pollPaymentStatus = async () => {
       try {
-        const rideData = await getRideStatus(currentRideId);
-        const currentStatus = rideData.Status || rideData.status;
-        if (isMounted && isPaymentConfirmedStatus(currentStatus)) {
-          clearInterval(pollingInterval);
+        const paymentPayload = await getRidePaymentStatus(currentRideId);
+        if (!isMounted) {
+          return false;
+        }
+
+        if (isPaymentSettled(paymentPayload)) {
           setWaitingForDriver(false);
+          return true;
         }
       } catch (err) {
         console.error('Payment polling error:', err);
       }
-    }, 3000);
+
+      return false;
+    };
+
+    const startPolling = async () => {
+      const isSettled = await pollPaymentStatus();
+      if (isSettled || !isMounted) {
+        return;
+      }
+
+      pollingInterval = setInterval(async () => {
+        const settled = await pollPaymentStatus();
+        if (settled && pollingInterval) {
+          clearInterval(pollingInterval);
+        }
+      }, 3000);
+    };
+
+    startPolling();
 
     return () => {
       isMounted = false;
-      clearInterval(pollingInterval);
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
     };
   }, [currentRideId]);
 
