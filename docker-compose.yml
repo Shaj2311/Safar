@@ -43,5 +43,13 @@ services:
     ports:
       - "5174:5174"
 
+  driver_frontend:
+    build: ./frontend/driver-app
+    container_name: driver-frontend
+    environment:
+      - VITE_API_URL=http://backend:8000
+    ports:
+      - "5175:5175"
+
 volumes:
   postgres_data:
