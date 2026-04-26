@@ -1,0 +1,55 @@
+services:
+  database:
+    build: ./db
+    container_name: safar-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=safar-database
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: safar-backend
+    environment:
+      - DATABASE_HOST=database
+      - DATABASE_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=safar-database
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database
+    volumes:
+      - ./backend:/app
+
+  passenger_frontend:
+    build: ./frontend/passengerApp
+    container_name: passenger-frontend
+    environment:
+      - VITE_API_URL=http://backend:8000
+    ports:
+      - "5173:5173"
+
+  admin_frontend:
+    build: ./frontend/AdminPanel
+    container_name: admin-frontend
+    environment:
+      - VITE_API_URL=http://backend:8000
+    ports:
+      - "5174:5174"
+
+  driver_frontend:
+    build: ./frontend/driver-app
+    container_name: driver-frontend
+    environment:
+      - VITE_API_URL=http://backend:8000
+    ports:
+      - "5175:5175"
+
+volumes:
+  postgres_data:

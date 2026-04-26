@@ -1,0 +1,32 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100vh;
+  width: 100%;
+}
+
+.sidebar-link {
+  color: #374151;
+  font-size: 0.9rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-link:hover {
+  background-color: #f1f5f9;
+  color: #2ec4a9;
+}
+
+.sidebar-link.active {
+  color: #2ec4a9;
+  background-color: #f0fdfb;
+  border-right: 3px solid #2ec4a9;
+  font-weight: 600;
+}

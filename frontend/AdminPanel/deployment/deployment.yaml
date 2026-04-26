@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: safar-admin-frontend-deployment
+  labels:
+    app: safar-admin-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: safar-admin-frontend
+  template:
+    metadata:
+      labels:
+        app: safar-admin-frontend
+    spec:
+      containers:
+      - name: admin-container
+        image: us-central1-docker.pkg.dev/project-b054c456-52e8-4026-af3/my-repo/frontend-admin:latest
+        ports:
+        - containerPort: 5174
+        envFrom:
+        - secretRef:
+            name: admin-env
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi

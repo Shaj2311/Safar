@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import { apiClient } from '../api/apiClient';
 import '../App.css';
 
 const containerStyle = {
@@ -24,15 +25,48 @@ const TripDashboard = () => {
         lng: ride?.pickup?.y || 74.3587
     };
 
+    // Live Tracking System
+    useEffect(() => {
+        let watchId = null;
+
+        if (isStarted && ride?.tripId) {
+            console.log("Starting Live Tracking for Trip:", ride.tripId);
+
+            watchId = navigator.geolocation.watchPosition(
+                async (position) => {
+                    const { latitude, longitude } = position.coords;
+                    try {
+                        await apiClient.post(`/rides/${ride.tripId}/location`, {
+                            x: latitude,
+                            y: longitude
+                        });
+                        console.log("Location sent:", { latitude, longitude });
+                    } catch (err) {
+                        console.error("Failed to send location:", err);
+                    }
+                },
+                (err) => console.error("Geolocation error:", err),
+                { enableHighAccuracy: true, distanceFilter: 10 }
+            );
+        }
+
+        return () => {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                console.log("Tracking Stopped.");
+            }
+        };
+    }, [isStarted, ride?.tripId]);
+
     const handleRideAction = async () => {
         try {
             if (!isStarted) {
-                // TEMPORARILY COMMENTED OUT TO BYPASS BACKEND
-                // await apiClient.patch(`/rides/${ride.tripId}/start`);
+                // Hit the backend to start the ride
+                await apiClient.patch(`/rides/${ride.tripId}/start`);
                 setIsStarted(true);
             } else {
-                // TEMPORARILY COMMENTED OUT TO BYPASS BACKEND
-                // await apiClient.patch(`/rides/${ride.tripId}/end`);
+                // Hit the backend to end the ride
+                await apiClient.patch(`/rides/${ride.tripId}/end`);
                 navigate('/trip-summary', { state: { ride } });
             }
         } catch (err) {

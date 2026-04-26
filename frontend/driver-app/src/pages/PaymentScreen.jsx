@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { apiClient } from '../api/apiClient';
 import '../App.css';
 
 const PaymentScreen = () => {
@@ -9,8 +10,8 @@ const PaymentScreen = () => {
 
     const handlePaymentReceived = async () => {
         try {
-            // TEMPORARILY COMMENTED OUT TO BYPASS BACKEND
-            // await apiClient.post(`/rides/${ride.tripId}/confirm-payment`);
+            // Hit the backend to confirm payment
+            await apiClient.post(`/rides/${ride.tripId}/confirm-payment`);
 
             // Navigate back to the Home screen
             navigate('/home');

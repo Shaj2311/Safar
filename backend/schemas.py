@@ -80,6 +80,13 @@ class TicketUpdate(BaseModel):
     content: Optional[str] = None
     status: Optional[Literal['open', 'resolved', 'escalated']] = None
 
+class StaffView(BaseModel):
+    staff_id: int
+    name: str
+    cnic: Optional[str]
+    phone_no: str
+    role: Literal['admin', 'support']
+
 class StaffCreate(BaseModel):
     name: str
     password: str

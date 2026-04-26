@@ -6,6 +6,36 @@ router = APIRouter(prefix="/users", tags=["User Profiles"])
 
 
 # Passenger
+@router.get("/me/passenger/profile")
+async def viewPassengerProfile(sessionKey: str, userId: int, db = Depends(get_db)):
+    """Passenger views their own profile details and ride history stats"""
+    validate_session(sessionKey)
+
+    async with db.acquire() as conn:
+        query = """
+            select u.name, p.phone_no, p.cnic,p.inserted_at as member_since,
+                (select count(*) from trip where passenger_id = $1 and is_deleted = false) as total_trips,
+                (select round(avg(r.score), 2) 
+                from rating r 
+                join trip t on r.trip_id = t.trip_id 
+                where t.passenger_id = $1 and r.is_deleted = false) as avg_rating
+            from appuser u
+            join passenger p on u.user_id = p.passenger_id
+            where u.user_id = $1 and p.is_deleted = false
+        """
+        profile = await conn.fetchrow(query, userId)
+        
+        if not profile:
+            raise HTTPException(status_code=404, detail="Passenger profile not found")
+
+        # Format data
+        result = dict(profile)
+        result["member_since"] = str(result["member_since"])
+        result["avg_rating"] = float(result["avg_rating"]) if result["avg_rating"] else 0.0
+        
+        return result
+
+
 @router.patch("/me/passenger")
 async def updatePassengerProfile(sessionKey: str, updates: PassengerUpdate, db = Depends(get_db)):
     """Update passenger profile data"""
