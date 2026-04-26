@@ -130,6 +130,43 @@ async def acceptRideRequest(sessionKey: str, id: int, db = Depends(get_db)):
         return {"rideId": id, "status": "Accepted"}
 
 
+@router.get("/{tripId}/location")
+async def getRideLocation(sessionKey: str, tripId: int, db = Depends(get_db)):
+    """Polled by passenger to get the latest trip coordinates for map updates"""
+    passengerId = validate_session(sessionKey)
+
+    async with db.acquire() as conn:
+        query = """
+            select lh.location, lh.timestamp
+            from locationhistory lh
+            join trip t on lh.trip_id = t.trip_id
+            where t.trip_id = $1 
+            and t.passenger_id = $2 
+            and t.is_deleted = false
+            order by lh.timestamp desc
+            limit 1
+        """
+        loc_record = await conn.fetchrow(query, tripId, passengerId)
+        
+        if not loc_record:
+            raise HTTPException(
+                status_code=404, 
+                detail="Location data unavailable"
+            )
+
+        # convert coordinates
+        location = loc_record["location"]
+        
+        return {
+            "tripId": tripId,
+            "coords": {
+                "lat": location.x, 
+                "lng": location.y
+            },
+            "lastUpdated": str(loc_record["timestamp"])
+        }
+
+
 @router.post("/{id}/location")
 async def updateLocation(sessionKey: str, id: int, gpsData: GPSData, db = Depends(get_db)):
     """Called continuously by driver during ride"""
