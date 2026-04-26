@@ -47,7 +47,7 @@ function App() {
       case 'vehicle-selection':
         return <VehicleSelection setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} setCurrentRideId={setCurrentRideId} pickup={pickup} dropoff={dropoff} />;
       case 'searching':
-        return <Searching setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} />;
+        return <Searching setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} setCurrentRideId={setCurrentRideId} />;
       case 'driver-arrived':
         return <DriverArrived setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} />;
       case 'trip-completed':

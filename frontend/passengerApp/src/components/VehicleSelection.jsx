@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapPlaceholder } from './MapPlaceholder';
-import { createRideRequest } from '../services/api';
+import { createRideRequest, extractRideIdFromPayload } from '../services/api';
 
 const getRouteInfo = (pickup, dropoff, callback) => {
   if (!pickup || !dropoff || !window.google) return;
@@ -27,14 +27,23 @@ const getRouteInfo = (pickup, dropoff, callback) => {
 export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRideId, pickup, dropoff }) => {
   const [loading, setLoading] = useState(false);
   const [routeInfo, setRouteInfo] = useState(null);
+  const [isOrderButtonReady, setIsOrderButtonReady] = useState(false);
 
   useEffect(() => {
     getRouteInfo(pickup, dropoff, (info) => setRouteInfo(info));
   }, [pickup, dropoff]);
 
+  // Prevent accidental tap-through when navigating from Home to this screen.
+  useEffect(() => {
+    setIsOrderButtonReady(false);
+    const timerId = setTimeout(() => setIsOrderButtonReady(true), 500);
+    return () => clearTimeout(timerId);
+  }, []);
+
   const fare = routeInfo ? Math.round(routeInfo.distanceKm * 100) : null;
 
   const handleOrderSafar = async () => {
+    if (!isOrderButtonReady || loading) return;
     if (!pickup || !dropoff) return;
     setLoading(true);
     try {
@@ -45,9 +54,18 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
         dropoff_y: dropoff.lng
       });
 
-      const rideId = response?.rideId || response?.tripId || response?.id || response?.ride_id || null;
-      console.log('Ride created. ID:', rideId, '| Full response:', response);
-      if (rideId) setCurrentRideId(rideId);
+      const rideId = extractRideIdFromPayload(response);
+      
+      console.log('--- BACKEND RESPONSE ---');
+      console.log(response); 
+      console.log('Captured Ride ID:', rideId);
+      console.log('------------------------');
+
+      if (rideId) {
+        setCurrentRideId(rideId);
+      } else {
+        console.warn("Warning: Backend did not return a valid Ride ID.");
+      }
 
       setLoading(false);
       setCurrentScreen('searching');
@@ -104,8 +122,8 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
           <button
             className="btn w-100 rounded-pill py-3 fw-bold fs-5 text-white"
             onClick={handleOrderSafar}
-            disabled={loading}
-            style={{ backgroundColor: '#80CCA5', opacity: loading ? 0.6 : 1 }}
+            disabled={loading || !isOrderButtonReady}
+            style={{ backgroundColor: '#80CCA5', opacity: (loading || !isOrderButtonReady) ? 0.6 : 1 }}
           >
             {loading ? 'Requesting...' : 'Order Safar'}
           </button>
