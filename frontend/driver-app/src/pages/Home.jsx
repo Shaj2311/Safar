@@ -1,16 +1,32 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { GoogleMap, useJsApiLoader } from '@react-google-maps/api';
 import '../App.css';
+
+const containerStyle = {
+    width: '100%',
+    height: '100%'
+};
+
+const center = {
+    lat: 31.5204,
+    lng: 74.3587
+};
 
 const Home = () => {
     const navigate = useNavigate();
+
+    const { isLoaded } = useJsApiLoader({
+        id: 'google-map-script',
+        googleMapsApiKey: 'AIzaSyBLCb5ePFZDzhY3B3lnT_hkFWE61qj1cWM'
+    });
 
     return (
         <div className="mobile-frame">
 
             <div style={{ position: 'relative', height: '100%', width: '100%', overflow: 'hidden', backgroundColor: '#cbd5e1' }}>
 
-                {/* Fixed Map Background Placeholder with Map Pin Emoji */}
+                {/* Fixed Map Background */}
                 <div
                     style={{
                         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -18,7 +34,16 @@ const Home = () => {
                         display: 'flex', justifyContent: 'center', alignItems: 'center'
                     }}
                 >
-                    <span style={{ fontSize: '40px' }}>📍</span>
+                    {isLoaded ? (
+                        <GoogleMap
+                            mapContainerStyle={containerStyle}
+                            center={center}
+                            zoom={14}
+                            options={{ disableDefaultUI: true, zoomControl: false }}
+                        />
+                    ) : (
+                        <div style={{ fontWeight: 'bold', color: '#4b5563' }}>Loading Map...</div>
+                    )}
                 </div>
 
                 {/* Hamburger Menu Icon */}

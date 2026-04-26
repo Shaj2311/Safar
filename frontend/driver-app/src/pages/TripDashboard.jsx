@@ -1,19 +1,43 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import '../App.css';
+
+const containerStyle = {
+    width: '100%',
+    height: '100%'
+};
 
 const TripDashboard = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const ride = location.state?.ride;
 
-    const [tripState, setTripState] = useState('start'); // 'start' or 'end'
+    const [isStarted, setIsStarted] = useState(false);
 
-    const handleAction = () => {
-        if (tripState === 'start') {
-            setTripState('end');
-        } else {
-            navigate('/trip-summary', { state: { ride } });
+    const { isLoaded } = useJsApiLoader({
+        id: 'google-map-script',
+        googleMapsApiKey: 'AIzaSyBLCb5ePFZDzhY3B3lnT_hkFWE61qj1cWM'
+    });
+
+    const mapCenter = {
+        lat: ride?.pickup?.x || 31.5204,
+        lng: ride?.pickup?.y || 74.3587
+    };
+
+    const handleRideAction = async () => {
+        try {
+            if (!isStarted) {
+                // TEMPORARILY COMMENTED OUT TO BYPASS BACKEND
+                // await apiClient.patch(`/rides/${ride.tripId}/start`);
+                setIsStarted(true);
+            } else {
+                // TEMPORARILY COMMENTED OUT TO BYPASS BACKEND
+                // await apiClient.patch(`/rides/${ride.tripId}/end`);
+                navigate('/trip-summary', { state: { ride } });
+            }
+        } catch (err) {
+            console.error('Error updating ride status:', err);
         }
     };
 
@@ -23,14 +47,25 @@ const TripDashboard = () => {
             <div style={{ position: 'relative', height: '100%', width: '100%', overflow: 'hidden', backgroundColor: '#cbd5e1', display: 'flex', flexDirection: 'column' }}>
 
                 {/* Fixed Map Area */}
-                <div style={{ position: 'relative', flex: '1 1 auto', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                    <span style={{ fontSize: '40px' }}>📍</span>
+                <div style={{ position: 'relative', flex: '1 1 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 0 }}>
+                    {isLoaded ? (
+                        <GoogleMap
+                            mapContainerStyle={containerStyle}
+                            center={mapCenter}
+                            zoom={15}
+                            options={{ disableDefaultUI: true, zoomControl: false }}
+                        >
+                            <Marker position={mapCenter} />
+                        </GoogleMap>
+                    ) : (
+                        <div style={{ fontWeight: 'bold', color: '#4b5563' }}>Loading Map...</div>
+                    )}
                 </div>
 
                 {/* Status Bar for Trip */}
                 <div style={{ backgroundColor: '#8bdabe', padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 'bold', color: '#111827', fontSize: '0.95rem' }}>Trip in Progress</span>
-                    <span style={{ fontWeight: 'bold', color: '#111827', fontSize: '0.95rem' }}>{ride?.distance || '3.1 km left'}</span>
+                    <span style={{ fontWeight: 'bold', color: '#111827', fontSize: '0.95rem' }}>{isStarted ? 'Trip in Progress' : 'Head to Pickup'}</span>
+                    <span style={{ fontWeight: 'bold', color: '#111827', fontSize: '0.95rem' }}>{ride?.dist ?? 0} km left</span>
                 </div>
 
                 {/* Bottom Section (White) */}
@@ -38,17 +73,10 @@ const TripDashboard = () => {
 
                     {/* Passenger Info */}
                     <div style={{ display: 'flex', alignItems: 'center', padding: '24px' }}>
-                        {/* Avatar */}
-                        <div style={{
-                            width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#cdd3ff',
-                            display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#111827', fontWeight: 'bold', fontSize: '1.25rem', marginRight: '16px'
-                        }}>
-                            {ride?.riderName ? ride.riderName.charAt(0).toUpperCase() : 'A'}
-                        </div>
                         {/* Name */}
                         <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 'bold', color: '#111827', fontSize: '1.05rem', lineHeight: '1.2' }}>
-                                {ride?.riderName || 'Passenger'}
+                                Passenger ID: {ride?.passengerId || ride?.id || 'N/A'}
                             </div>
                             <div style={{ color: '#6b7280', fontSize: '0.9rem' }}>Passenger</div>
                         </div>
@@ -63,12 +91,16 @@ const TripDashboard = () => {
                     <div style={{ backgroundColor: '#f3f4f6', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div style={{ fontSize: '0.85rem', color: '#4b5563', width: '80px' }}>Pickup</div>
-                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.95rem', textAlign: 'right' }}>{ride?.pickup || 'Pickup Location'}</div>
+                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.95rem', textAlign: 'right' }}>
+                                Lat: {ride?.pickup?.x}, Lng: {ride?.pickup?.y}
+                            </div>
                         </div>
                         <div style={{ borderTop: '1px solid #e5e7eb', width: '100%', margin: '4px 0' }}></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div style={{ fontSize: '0.85rem', color: '#4b5563', width: '80px' }}>Dropoff</div>
-                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.95rem', textAlign: 'right' }}>{ride?.dropoff || 'Dropoff Location'}</div>
+                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.95rem', textAlign: 'right' }}>
+                                Lat: {ride?.dropoff?.x}, Lng: {ride?.dropoff?.y}
+                            </div>
                         </div>
                     </div>
 
@@ -76,14 +108,14 @@ const TripDashboard = () => {
                     <div style={{ padding: '24px', marginTop: 'auto', paddingBottom: '35px' }}>
                         <button
                             className="btn w-100 shadow-sm"
-                            onClick={handleAction}
+                            onClick={handleRideAction}
                             style={{
-                                backgroundColor: tripState === 'start' ? '#20c997' : '#ef4444',
-                                color: tripState === 'start' ? '#1F2937' : '#ffffff',
+                                backgroundColor: isStarted ? '#ef4444' : '#20c997',
+                                color: isStarted ? '#ffffff' : '#1F2937',
                                 borderRadius: '25px', padding: '16px', fontWeight: 'bold', fontSize: '1.2rem', border: 'none'
                             }}
                         >
-                            {tripState === 'start' ? 'Start Ride' : 'End Trip'}
+                            {isStarted ? 'End Ride' : 'Start Ride'}
                         </button>
                     </div>
                 </div>
