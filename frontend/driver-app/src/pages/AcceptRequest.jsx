@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useJsApiLoader } from '@react-google-maps/api';
 import { apiClient } from '../api/apiClient';
 import '../App.css';
 
@@ -16,6 +17,41 @@ const AcceptRequest = () => {
     const [requests, setRequests] = useState([]);
 
     const [loading, setLoading] = useState(false);
+    const [addressMap, setAddressMap] = useState({});
+
+    const { isLoaded } = useJsApiLoader({
+        id: 'google-map-script',
+        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    });
+
+    useEffect(() => {
+        if (isLoaded && sortedRequests.length > 0) {
+            const geocoder = new window.google.maps.Geocoder();
+            sortedRequests.forEach(req => {
+                const tripId = req.tripId || req.id;
+                if (!addressMap[tripId]) {
+                    // Reverse Geocode Pickup
+                    geocoder.geocode({ location: { lat: req.pickup.x, lng: req.pickup.y } }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            setAddressMap(prev => ({
+                                ...prev,
+                                [tripId]: { ...prev[tripId], pickup: results[0].formatted_address }
+                            }));
+                        }
+                    });
+                    // Reverse Geocode Dropoff
+                    geocoder.geocode({ location: { lat: req.dropoff.x, lng: req.dropoff.y } }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            setAddressMap(prev => ({
+                                ...prev,
+                                [tripId]: { ...prev[tripId], dropoff: results[0].formatted_address }
+                            }));
+                        }
+                    });
+                }
+            });
+        }
+    }, [isLoaded, requests]); // Re-run when maps load or new requests arrive
 
     useEffect(() => {
         // Initial fetch
@@ -117,11 +153,11 @@ const AcceptRequest = () => {
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
                                         <div style={{ fontSize: '0.8rem', color: '#4b5563', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3b82f6' }}></div>
-                                            Lat: {req.pickup?.x}, Lng: {req.pickup?.y}
+                                            {addressMap[req.tripId || req.id]?.pickup || `Lat: ${req.pickup?.x}, Lng: ${req.pickup?.y}`}
                                         </div>
                                         <div style={{ fontSize: '0.8rem', color: '#4b5563', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }}></div>
-                                            Lat: {req.dropoff?.x}, Lng: {req.dropoff?.y}
+                                            {addressMap[req.tripId || req.id]?.dropoff || `Lat: ${req.dropoff?.x}, Lng: ${req.dropoff?.y}`}
                                         </div>
                                     </div>
                                     <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#4b5563', backgroundColor: '#e5e7eb', padding: '4px 10px', borderRadius: '12px' }}>

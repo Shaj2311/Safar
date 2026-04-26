@@ -8,6 +8,8 @@ import TripDashboard from './pages/TripDashboard';
 import TripSummary from './pages/TripSummary';
 import PaymentScreen from './pages/PaymentScreen';
 import DriverProfile from './pages/DriverProfile';
+import CallPassenger from './pages/CallPassenger';
+import TripHistory from './pages/TripHistory';
 
 function App() {
   return (
@@ -20,6 +22,8 @@ function App() {
         <Route path="/trip-summary" element={<TripSummary />} />
         <Route path="/payment" element={<PaymentScreen />} />
         <Route path="/profile" element={<DriverProfile />} />
+        <Route path="/call" element={<CallPassenger />} />
+        <Route path="/trip-history" element={<TripHistory />} />
       </Routes>
     </Router>
   );

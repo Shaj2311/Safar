@@ -104,6 +104,14 @@ const DriverProfile = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Trip History Link */}
+                    <div
+                        onClick={() => navigate('/trip-history')}
+                        style={{ width: '100%', marginTop: '35px', cursor: 'pointer', display: 'flex', justifyContent: 'flex-start' }}
+                    >
+                        <span style={{ fontSize: '1.15rem', color: '#111827', fontWeight: '500' }}>Trip history</span>
+                    </div>
                 </div>
 
                 {/* Log Out Button */}

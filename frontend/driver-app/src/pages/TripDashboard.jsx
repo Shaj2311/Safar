@@ -15,6 +15,8 @@ const TripDashboard = () => {
     const ride = location.state?.ride;
 
     const [isStarted, setIsStarted] = useState(false);
+    const [pickupAddress, setPickupAddress] = useState('Fetching...');
+    const [dropoffAddress, setDropoffAddress] = useState('Fetching...');
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
@@ -24,6 +26,29 @@ const TripDashboard = () => {
         lat: ride?.pickup?.x || 31.5204,
         lng: ride?.pickup?.y || 74.3587
     };
+
+    // Reverse Geocoding Logic
+    useEffect(() => {
+        if (isLoaded && ride) {
+            const geocoder = new window.google.maps.Geocoder();
+            // Reverse Geocode Pickup
+            geocoder.geocode({ location: { lat: ride.pickup.x, lng: ride.pickup.y } }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    setPickupAddress(results[0].formatted_address);
+                } else {
+                    setPickupAddress(`Lat: ${ride.pickup.x}, Lng: ${ride.pickup.y}`);
+                }
+            });
+            // Reverse Geocode Dropoff
+            geocoder.geocode({ location: { lat: ride.dropoff.x, lng: ride.dropoff.y } }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    setDropoffAddress(results[0].formatted_address);
+                } else {
+                    setDropoffAddress(`Lat: ${ride.dropoff.x}, Lng: ${ride.dropoff.y}`);
+                }
+            });
+        }
+    }, [isLoaded, ride]);
 
     // Live Tracking System
     useEffect(() => {
@@ -103,9 +128,20 @@ const TripDashboard = () => {
 
                 {/* Bottom Section (White) */}
                 <div style={{ backgroundColor: '#fff', display: 'flex', flexDirection: 'column', height: '42%', zIndex: 10 }}>
+                    <style>
+                        {`
+                            .hide-scrollbar::-webkit-scrollbar {
+                                display: none;
+                            }
+                            .hide-scrollbar {
+                                -ms-overflow-style: none;
+                                scrollbar-width: none;
+                            }
+                        `}
+                    </style>
 
-                    {/* Passenger Info */}
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '24px' }}>
+                    {/* Passenger Info (Fixed) */}
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '24px', flexShrink: 0 }}>
                         {/* Name */}
                         <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 'bold', color: '#111827', fontSize: '1.05rem', lineHeight: '1.2' }}>
@@ -116,29 +152,44 @@ const TripDashboard = () => {
                         {/* Actions */}
                         <div style={{ display: 'flex', gap: '10px' }}>
                             <div style={{ width: '45px', height: '45px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '0.8rem', fontWeight: '600', color: '#111827' }}>Text</div>
-                            <div style={{ width: '45px', height: '45px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '0.8rem', fontWeight: '600', color: '#111827' }}>Call</div>
+                            <div
+                                onClick={() => navigate('/call', { state: { ride } })}
+                                style={{ width: '45px', height: '45px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '0.8rem', fontWeight: '600', color: '#111827', cursor: 'pointer' }}
+                            >
+                                Call
+                            </div>
                         </div>
                     </div>
 
-                    {/* Destination Card */}
-                    <div style={{ backgroundColor: '#f3f4f6', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* Destination Card (Scrollable Middle) */}
+                    <div
+                        className="hide-scrollbar"
+                        style={{
+                            backgroundColor: '#f3f4f6',
+                            padding: '16px 24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            overflowY: 'auto',
+                            flex: 1
+                        }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div style={{ fontSize: '0.85rem', color: '#4b5563', width: '80px' }}>Pickup</div>
-                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.95rem', textAlign: 'right' }}>
-                                Lat: {ride?.pickup?.x}, Lng: {ride?.pickup?.y}
+                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.90rem', textAlign: 'right', flex: 1 }}>
+                                {pickupAddress}
                             </div>
                         </div>
                         <div style={{ borderTop: '1px solid #e5e7eb', width: '100%', margin: '4px 0' }}></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div style={{ fontSize: '0.85rem', color: '#4b5563', width: '80px' }}>Dropoff</div>
-                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.95rem', textAlign: 'right' }}>
-                                Lat: {ride?.dropoff?.x}, Lng: {ride?.dropoff?.y}
+                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.90rem', textAlign: 'right', flex: 1 }}>
+                                {dropoffAddress}
                             </div>
                         </div>
                     </div>
 
-                    {/* Action Button */}
-                    <div style={{ padding: '24px', marginTop: 'auto', paddingBottom: '35px' }}>
+                    {/* Action Button (Fixed Bottom) */}
+                    <div style={{ padding: '24px', marginTop: 'auto', paddingBottom: '35px', flexShrink: 0 }}>
                         <button
                             className="btn w-100 shadow-sm"
                             onClick={handleRideAction}
