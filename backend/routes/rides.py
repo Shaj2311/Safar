@@ -60,7 +60,7 @@ async def getRideStatus(sessionKey: str, id: int, db = Depends(get_db)):
     validate_session(sessionKey)
     async with db.acquire() as conn:
         query = """
-            select t.start_time, t.end_time, t.is_deleted
+            select t.start_time, t.end_time, t.driver_id, t.is_deleted
             from trip t
             where t.trip_id = $1
         """
@@ -76,6 +76,8 @@ async def getRideStatus(sessionKey: str, id: int, db = Depends(get_db)):
         return {"Status": "Completed"}
     if row['start_time']:
         return {"Status": "In progress"}
+    if row['driver_id']:
+        return {"Status": "Accepted"}
     
     return {"Status": "Pending"}
 
