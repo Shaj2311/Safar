@@ -5,6 +5,14 @@ import '../App.css';
 
 const AcceptRequest = () => {
     const navigate = useNavigate();
+    // const [requests, setRequests] = useState([{
+    //     tripId: 3,
+    //     passengerId: 7,
+    //     pickup: { x: 31.403, y: 74.2106 },
+    //     dropoff: { x: 31.48178, y: 74.30328 },
+    //     dist: 3
+    // }]);
+    // // COMMENTED   
     const [requests, setRequests] = useState([]);
 
     const [loading, setLoading] = useState(false);

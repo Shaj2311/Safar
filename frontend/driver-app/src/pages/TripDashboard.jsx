@@ -17,9 +17,8 @@ const TripDashboard = () => {
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
-        googleMapsApiKey: 'AIzaSyBLCb5ePFZDzhY3B3lnT_hkFWE61qj1cWM'
+        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     });
-
     const mapCenter = {
         lat: ride?.pickup?.x || 31.5204,
         lng: ride?.pickup?.y || 74.3587

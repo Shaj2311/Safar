@@ -15,7 +15,7 @@ const TripSummary = () => {
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
-        googleMapsApiKey: 'AIzaSyBLCb5ePFZDzhY3B3lnT_hkFWE61qj1cWM'
+        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     });
 
     const mapCenter = {
