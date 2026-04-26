@@ -63,8 +63,14 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
 
       if (rideId) {
         setCurrentRideId(rideId);
+        if (fare !== null) {
+          localStorage.setItem(`safarEstimatedFare_${rideId}`, String(fare));
+        }
       } else {
         console.warn("Warning: Backend did not return a valid Ride ID.");
+        if (fare !== null) {
+          localStorage.setItem('safarEstimatedFare_latest', String(fare));
+        }
       }
 
       setLoading(false);

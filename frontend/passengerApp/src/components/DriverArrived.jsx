@@ -4,6 +4,23 @@ import { getRideStatus, getDriverProfileByAnyId, getRideDetailsByAnyEndpoint } f
 
 const normalizeKey = (key) => String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
 
+const normalizeStatusValue = (status) => String(status || '').trim().toLowerCase().replace(/\s+/g, '_');
+
+const isRideTerminalStatus = (status) => {
+  const normalized = normalizeStatusValue(status);
+  return [
+    'completed',
+    'complete',
+    'trip_completed',
+    'ended',
+    'end',
+    'finished',
+    'payment_pending',
+    'awaiting_payment',
+    'paid'
+  ].includes(normalized);
+};
+
 const findFirstValueByKeyNames = (source, keyNames) => {
   if (!source || typeof source !== 'object') {
     return null;
@@ -346,6 +363,32 @@ const extractEtaText = (source) => {
   return toEtaText(etaValue);
 };
 
+const hasRideEndedSignal = (source) => {
+  if (!source || typeof source !== 'object') {
+    return false;
+  }
+
+  const statusFromDetails = findFirstValueByKeyNames(source, ['status', 'ride_status', 'rideStatus', 'trip_status', 'tripStatus'])
+    || findValueByKeyHints(source, ['status']);
+
+  if (isRideTerminalStatus(statusFromDetails)) {
+    return true;
+  }
+
+  const endTimeValue = findFirstValueByKeyNames(source, [
+    'end_time',
+    'endTime',
+    'completed_at',
+    'completedAt',
+    'trip_end_time',
+    'tripEndTime',
+    'dropoff_time',
+    'dropoffTime'
+  ]);
+
+  return endTimeValue !== null && endTimeValue !== undefined && String(endTimeValue).trim() !== '';
+};
+
 const mapDriverFromSource = (source) => {
   if (!source || typeof source !== 'object') {
     return null;
@@ -438,14 +481,14 @@ export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId }) 
       try {
         const data = await getRideStatus(currentRideId);
         const currentStatus = data.Status || data.status;
-        const normalizedStatus = String(currentStatus || '').toLowerCase();
+        const normalizedStatus = normalizeStatusValue(currentStatus);
         let nextEtaText = extractEtaText(data);
 
         if (isMounted) {
           setRideStatusText(normalizedStatus);
         }
-        
-        if (isMounted && (currentStatus === 'completed' || currentStatus === 'Completed')) {
+
+        if (isMounted && isRideTerminalStatus(currentStatus)) {
           clearInterval(pollingInterval);
           setCurrentScreen('trip-completed');
           return;
@@ -471,6 +514,12 @@ export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId }) 
         if (isMounted && !driverRef.current) {
           const fallbackRideDetails = await getRideDetailsByAnyEndpoint(currentRideId);
           if (fallbackRideDetails) {
+            if (hasRideEndedSignal(fallbackRideDetails)) {
+              clearInterval(pollingInterval);
+              setCurrentScreen('trip-completed');
+              return;
+            }
+
             nextEtaText = nextEtaText || extractEtaText(fallbackRideDetails);
             const mappedFallbackDriver = normalizeDriverData(
               ...collectRelatedObjects(fallbackRideDetails, 'driver'),
