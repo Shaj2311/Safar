@@ -1,22 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { MapPlaceholder } from './MapPlaceholder';
-import { getRideStatus, cancelRideRequest } from '../services/api';
+import { getRideStatus, cancelRideRequest, findActiveRideId } from '../services/api';
 
-export const Searching = ({ setCurrentScreen, currentRideId }) => {
+export const Searching = ({ setCurrentScreen, currentRideId, setCurrentRideId }) => {
   const [loading, setLoading] = useState(false);
+  const [resolvedRideId, setResolvedRideId] = useState(currentRideId || null);
 
   useEffect(() => {
-    let pollingInterval;
+    if (currentRideId) {
+      setResolvedRideId(currentRideId);
+    }
+  }, [currentRideId]);
+
+  useEffect(() => {
+    let statusPollingInterval;
+    let rideIdRecoveryInterval;
     let isMounted = true;
 
-    const pollStatus = async () => {
-      if (!currentRideId) return;
+    const tryRecoverRideId = async () => {
+      if (resolvedRideId) return;
       try {
-        const rideData = await getRideStatus(currentRideId);
+        const recoveredRideId = await findActiveRideId();
+        if (isMounted && recoveredRideId) {
+          setResolvedRideId(recoveredRideId);
+          if (setCurrentRideId) {
+            setCurrentRideId(recoveredRideId);
+          }
+        }
+      } catch (err) {
+        console.error('Ride ID recovery error:', err);
+      }
+    };
+
+    const pollStatus = async () => {
+      if (!resolvedRideId) return;
+      try {
+        const rideData = await getRideStatus(resolvedRideId);
         console.log('Poll response:', rideData);
         const currentStatus = rideData.Status || rideData.status;
         if (isMounted && (currentStatus === 'accepted' || currentStatus === 'Accepted' || currentStatus === 'driver_assigned' || currentStatus === 'in_progress')) {
-          clearInterval(pollingInterval);
+          clearInterval(statusPollingInterval);
           setCurrentScreen('driver-arrived');
         }
       } catch (err) {
@@ -24,34 +47,29 @@ export const Searching = ({ setCurrentScreen, currentRideId }) => {
       }
     };
 
-    if (currentRideId) {
-      pollingInterval = setInterval(pollStatus, 3000);
+    if (resolvedRideId) {
+      statusPollingInterval = setInterval(pollStatus, 3000);
       pollStatus();
     } else {
-      // Agar API connect nahi hui toh 3 second baad directly driver arrived dikha do (testing purpose)
-      pollingInterval = setTimeout(() => {
-        if (isMounted) setCurrentScreen('driver-arrived');
-      }, 3000);
+      rideIdRecoveryInterval = setInterval(tryRecoverRideId, 3000);
+      tryRecoverRideId();
     }
 
     return () => {
       isMounted = false;
-      if (currentRideId) {
-        clearInterval(pollingInterval);
-      } else {
-        clearTimeout(pollingInterval);
-      }
+      if (statusPollingInterval) clearInterval(statusPollingInterval);
+      if (rideIdRecoveryInterval) clearInterval(rideIdRecoveryInterval);
     };
-  }, [setCurrentScreen, currentRideId]);
+  }, [setCurrentScreen, resolvedRideId, setCurrentRideId]);
 
   const handleCancel = async () => {
-    if (!currentRideId) {
+    if (!resolvedRideId) {
       setCurrentScreen('home');
       return;
     }
     setLoading(true);
     try {
-      await cancelRideRequest(currentRideId);
+      await cancelRideRequest(resolvedRideId);
       setLoading(false);
       setCurrentScreen('home');
     } catch (error) {
@@ -65,7 +83,9 @@ export const Searching = ({ setCurrentScreen, currentRideId }) => {
     <MapPlaceholder>
       <div className="overlay-drawer text-center">
         <div className="py-4 bg-light rounded-3 mb-4">
-          <span className="text-dark">Looking for nearby drivers...</span>
+          <span className="text-dark">
+            {resolvedRideId ? 'Looking for nearby drivers...' : 'Request sent. Finding your ride...'}
+          </span>
         </div>
 
         <button

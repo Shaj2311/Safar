@@ -1,5 +1,65 @@
 const BASE_URL = '/api';
 
+export const extractRideIdFromPayload = (payload) => {
+    const candidateKeys = ['id', 'ride_id', 'rideId', 'trip_id', 'tripId', 'request_id', 'requestId'];
+    const queue = [payload];
+    const visited = new Set();
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+
+        if (current === null || current === undefined) {
+            continue;
+        }
+
+        if (typeof current === 'number' && Number.isFinite(current)) {
+            return current;
+        }
+
+        if (typeof current === 'string') {
+            const numericValue = Number(current);
+            if (!Number.isNaN(numericValue) && Number.isFinite(numericValue)) {
+                return numericValue;
+            }
+            continue;
+        }
+
+        if (typeof current !== 'object') {
+            continue;
+        }
+
+        if (visited.has(current)) {
+            continue;
+        }
+        visited.add(current);
+
+        if (Array.isArray(current)) {
+            for (const item of current) {
+                queue.push(item);
+            }
+            continue;
+        }
+
+        for (const key of candidateKeys) {
+            if (Object.prototype.hasOwnProperty.call(current, key)) {
+                const value = current[key];
+                const numericValue = Number(value);
+                if (!Number.isNaN(numericValue) && Number.isFinite(numericValue)) {
+                    return numericValue;
+                }
+            }
+        }
+
+        for (const value of Object.values(current)) {
+            if (typeof value === 'object' || typeof value === 'number' || typeof value === 'string') {
+                queue.push(value);
+            }
+        }
+    }
+
+    return null;
+};
+
 export const loginRequest = async (credentials) => {
     try {
         const response = await fetch(`${BASE_URL}/auth/login/passenger`, {
@@ -89,6 +149,48 @@ export const getRideStatus = async (rideId) => {
     } catch (error) {
         console.error("API Error: getRideStatus", error);
         throw error;
+    }
+};
+
+export const findActiveRideId = async () => {
+    try {
+        const sessionKey = localStorage.getItem('sessionKey');
+        if (!sessionKey) {
+            return null;
+        }
+
+        const endpoints = [
+            `${BASE_URL}/rides/?sessionKey=${sessionKey}`,
+            `${BASE_URL}/rides?sessionKey=${sessionKey}`,
+        ];
+
+        for (const endpoint of endpoints) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    continue;
+                }
+
+                const data = await response.json();
+                const rideId = extractRideIdFromPayload(data);
+                if (rideId) {
+                    return rideId;
+                }
+            } catch (innerError) {
+                console.warn('findActiveRideId endpoint failed:', endpoint, innerError);
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error('API Error: findActiveRideId', error);
+        return null;
     }
 };
 
