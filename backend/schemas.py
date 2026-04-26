@@ -43,6 +43,7 @@ class RideRequest(BaseModel):
     pickup_y: float
     dropoff_x: float
     dropoff_y: float
+    dist: float
 
 class GPSData(BaseModel):
     x: float

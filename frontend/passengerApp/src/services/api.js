@@ -363,3 +363,28 @@ export const getRideDetailsByAnyEndpoint = async (rideId) => {
     return hasAnyData ? mergedData : null;
 };
 
+export const getRideDriverDetails = async (tripId) => {
+    try {
+        const sessionKey = localStorage.getItem('sessionKey');
+        if (!tripId) {
+            throw new Error('Trip id is required to fetch driver details');
+        }
+
+        if (!sessionKey) {
+            throw new Error('Session key is required to fetch driver details');
+        }
+
+        const url = new URL(`${BASE_URL}/rides/${tripId}/driver`, window.location.origin);
+        url.searchParams.append('sessionKey', sessionKey);
+
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+            throw new Error('Failed to fetch ride driver details');
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("API Error: getRideDriverDetails", error);
+        throw error;
+    }
+};
+

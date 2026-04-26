@@ -1,17 +1,106 @@
 import React, { useEffect, useState } from 'react';
 import { MapPlaceholder } from './MapPlaceholder';
-import { getRideStatus, getRideSummary } from '../services/api';
+import { getRideStatus, getRideSummary, getRideDetailsByAnyEndpoint } from '../services/api';
+
+const normalizeStatusValue = (status) => String(status || '').trim().toLowerCase().replace(/\s+/g, '_');
+
+const isPaymentConfirmedStatus = (status) => {
+  const normalized = normalizeStatusValue(status);
+  return [
+    'paid',
+    'payment_confirmed',
+    'paymentconfirmed',
+    'confirmed_payment',
+    'confirmedpayment'
+  ].includes(normalized);
+};
+
+const extractFareValue = (payload) => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const candidateKeys = [
+    'fare',
+    'amount',
+    'price',
+    'total_fare',
+    'totalFare',
+    'trip_fare',
+    'tripFare',
+    'final_fare',
+    'finalFare',
+    'payment_amount',
+    'paymentAmount'
+  ];
+
+  const queue = [payload];
+  const visited = new Set();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    if (current === null || current === undefined) {
+      continue;
+    }
+
+    if (typeof current !== 'object') {
+      continue;
+    }
+
+    if (visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+
+    if (Array.isArray(current)) {
+      for (const item of current) {
+        queue.push(item);
+      }
+      continue;
+    }
+
+    for (const key of candidateKeys) {
+      if (Object.prototype.hasOwnProperty.call(current, key)) {
+        const numericValue = Number(current[key]);
+        if (!Number.isNaN(numericValue) && Number.isFinite(numericValue) && numericValue >= 0) {
+          return Math.round(numericValue);
+        }
+      }
+    }
+
+    for (const value of Object.values(current)) {
+      if (value && typeof value === 'object') {
+        queue.push(value);
+      }
+    }
+  }
+
+  return null;
+};
 
 export const TripCompleted = ({ setCurrentScreen, onMenuClick, currentRideId }) => {
   const [summary, setSummary] = useState(null);
+  const [fallbackDetails, setFallbackDetails] = useState(null);
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
+  const [fallbackLoaded, setFallbackLoaded] = useState(false);
   const [waitingForDriver, setWaitingForDriver] = useState(true);
 
   useEffect(() => {
     // Fetch ride summary (fare, distance, etc.) from backend
     if (currentRideId) {
+      setSummaryLoaded(false);
+      setFallbackLoaded(false);
+
       getRideSummary(currentRideId)
         .then(data => setSummary(data))
-        .catch(err => console.error('Could not fetch summary:', err));
+        .catch(err => console.error('Could not fetch summary:', err))
+        .finally(() => setSummaryLoaded(true));
+
+      getRideDetailsByAnyEndpoint(currentRideId)
+        .then(data => setFallbackDetails(data))
+        .catch(err => console.error('Could not fetch fallback ride details:', err))
+        .finally(() => setFallbackLoaded(true));
     }
   }, [currentRideId]);
 
@@ -23,8 +112,7 @@ export const TripCompleted = ({ setCurrentScreen, onMenuClick, currentRideId }) 
       try {
         const rideData = await getRideStatus(currentRideId);
         const currentStatus = rideData.Status || rideData.status;
-        // When driver confirms payment, status changes to 'paid' or 'Paid'
-        if (isMounted && (currentStatus === 'paid' || currentStatus === 'Paid')) {
+        if (isMounted && isPaymentConfirmedStatus(currentStatus)) {
           clearInterval(pollingInterval);
           setWaitingForDriver(false);
         }
@@ -39,12 +127,27 @@ export const TripCompleted = ({ setCurrentScreen, onMenuClick, currentRideId }) 
     };
   }, [currentRideId]);
 
-  // Display the fare: prefer backend summary, fall back to localStorage calculated fare
-  const fareDisplay = summary?.fare
-    ? `Rs. ${summary.fare}`
-    : summary?.amount
-    ? `Rs. ${summary.amount}`
-    : '—';
+  const summaryFare = extractFareValue(summary);
+  const fallbackFare = extractFareValue(fallbackDetails);
+
+  const localEstimatedFare = (() => {
+    if (!currentRideId) {
+      const latestValue = Number(localStorage.getItem('safarEstimatedFare_latest'));
+      return Number.isNaN(latestValue) ? null : latestValue;
+    }
+
+    const rideSpecificValue = Number(localStorage.getItem(`safarEstimatedFare_${currentRideId}`));
+    if (!Number.isNaN(rideSpecificValue)) {
+      return rideSpecificValue;
+    }
+
+    const latestValue = Number(localStorage.getItem('safarEstimatedFare_latest'));
+    return Number.isNaN(latestValue) ? null : latestValue;
+  })();
+
+  const canUseLocalFallbackFare = summaryLoaded && fallbackLoaded;
+  const resolvedFare = localEstimatedFare ?? summaryFare ?? fallbackFare ?? (canUseLocalFallbackFare ? localEstimatedFare : null);
+  const fareDisplay = resolvedFare !== null && resolvedFare !== undefined ? `Rs. ${resolvedFare}` : '—';
 
   return (
     <MapPlaceholder onMenuClick={onMenuClick}>

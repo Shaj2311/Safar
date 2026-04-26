@@ -51,7 +51,8 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
         pickup_x: pickup.lat,
         pickup_y: pickup.lng,
         dropoff_x: dropoff.lat,
-        dropoff_y: dropoff.lng
+        dropoff_y: dropoff.lng,
+        dist: routeInfo ? routeInfo.distanceKm : 0
       });
 
       const rideId = extractRideIdFromPayload(response);
@@ -63,8 +64,14 @@ export const VehicleSelection = ({ setCurrentScreen, onMenuClick, setCurrentRide
 
       if (rideId) {
         setCurrentRideId(rideId);
+        if (fare !== null) {
+          localStorage.setItem(`safarEstimatedFare_${rideId}`, String(fare));
+        }
       } else {
         console.warn("Warning: Backend did not return a valid Ride ID.");
+        if (fare !== null) {
+          localStorage.setItem('safarEstimatedFare_latest', String(fare));
+        }
       }
 
       setLoading(false);
