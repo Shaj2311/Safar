@@ -27,7 +27,6 @@ async def resolveEscalatedTicket(sessionKey: str, id: int, db = Depends(get_db))
         if current_status is None:
             raise HTTPException(status_code=404, detail="ticket not found")
 
-        #STRICT CHECK: Is it actually escalated?
         #If it's already 'resolved' or still 'open', exit
         if current_status != 'escalated':
             raise HTTPException(
@@ -88,13 +87,13 @@ async def adminCreateDriver(sessionKey: str, details: AdminDriverCreate, db = De
     async with db.acquire() as conn:
         await verify_admin(adminId, conn)
 
-        # 1. Create the base User
+        #Create the base User
         new_user_id = await conn.fetchval(
                 "insert into appuser (name, password) values ($1, $2) returning user_id",
                 details.name, details.password
                 )
 
-        # 2. Create the Driver profile linked to that User
+        #Create the Driver profile linked to that User
         await conn.execute(
                 "insert into driver (driver_id, cnic, phone_no) values ($1, $2, $3)",
                 new_user_id, details.cnic, details.phone_no
