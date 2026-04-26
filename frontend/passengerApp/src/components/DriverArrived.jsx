@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { MapPlaceholder } from './MapPlaceholder';
-import { getRideStatus, getRideDriverDetails, getRideDetailsByAnyEndpoint } from '../services/api';
+import { getRideStatus, getRideDriverDetails, getRideDetailsByAnyEndpoint, getRideLocation } from '../services/api';
 
 const normalizeKey = (key) => String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -26,6 +26,55 @@ const isDriverAssignedStatus = (status) => {
   return ['accepted', 'driver_assigned', 'in_progress'].includes(normalizedStatus);
 };
 
+const isTripInProgressStatus = (status) => {
+  const normalizedStatus = normalizeStatusValue(status);
+  return ['in_progress', 'trip_started', 'started', 'on_trip'].includes(normalizedStatus);
+};
+
+const toFiniteNumber = (value) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+const toCoordinatePoint = (xValue, yValue) => {
+  const lat = toFiniteNumber(xValue);
+  const lng = toFiniteNumber(yValue);
+
+  if (lat === null || lng === null) {
+    return null;
+  }
+
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return null;
+  }
+
+  return { lat, lng };
+};
+
+const normalizePointLike = (value) => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const latLngPoint = toCoordinatePoint(value.lat, value.lng);
+  if (latLngPoint) {
+    return latLngPoint;
+  }
+
+  return toCoordinatePoint(value.x, value.y);
+};
+
+const pickFirstCoordinatePoint = (...candidates) => {
+  for (const candidate of candidates) {
+    const normalizedPoint = normalizePointLike(candidate);
+    if (normalizedPoint) {
+      return normalizedPoint;
+    }
+  }
+
+  return null;
+};
+
 const findFirstValueByKeys = (source, keyNames) => {
   if (!source || typeof source !== 'object') {
     return null;
@@ -48,17 +97,17 @@ const findFirstValueByKeys = (source, keyNames) => {
     visited.add(current);
 
     if (Array.isArray(current)) {
-      for (const item of current) {
-        queue.push(item);
+      for (let index = current.length - 1; index >= 0; index -= 1) {
+        queue.push(current[index]);
       }
       continue;
     }
 
     for (const [key, value] of Object.entries(current)) {
-      const normalizedKey = normalizeKey(key);
+      const normalizedCurrentKey = normalizeKey(key);
 
       if (
-        targetKeys.has(normalizedKey)
+        targetKeys.has(normalizedCurrentKey)
         && value !== null
         && value !== undefined
         && String(value).trim() !== ''
@@ -73,6 +122,136 @@ const findFirstValueByKeys = (source, keyNames) => {
   }
 
   return null;
+};
+
+const findFirstObjectByKeys = (source, keyNames) => {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const targetKeys = new Set(keyNames.map((key) => normalizeKey(key)));
+  const queue = [source];
+  const visited = new Set();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    if (!current || typeof current !== 'object') {
+      continue;
+    }
+
+    if (visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+
+    if (Array.isArray(current)) {
+      for (let index = current.length - 1; index >= 0; index -= 1) {
+        queue.push(current[index]);
+      }
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(current)) {
+      if (targetKeys.has(normalizeKey(key)) && value && typeof value === 'object') {
+        return value;
+      }
+
+      if (value && typeof value === 'object') {
+        queue.push(value);
+      }
+    }
+  }
+
+  return null;
+};
+
+const extractPointFromSourceByKeys = (source, xKeys, yKeys) => {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const xValue = findFirstValueByKeys(source, xKeys);
+  const yValue = findFirstValueByKeys(source, yKeys);
+  return toCoordinatePoint(xValue, yValue);
+};
+
+const extractDriverLocationPoint = (source) => {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const nestedLocationObject = findFirstObjectByKeys(source, [
+    'driver_location',
+    'driverLocation',
+    'vehicle_location',
+    'vehicleLocation',
+    'current_location',
+    'currentLocation',
+    'location',
+    'gps',
+    'coordinates',
+    'coords',
+  ]);
+
+  const nestedPoint = extractPointFromSourceByKeys(
+    nestedLocationObject,
+    ['x', 'lat', 'latitude', 'driver_x', 'driverX', 'vehicle_x', 'vehicleX'],
+    ['y', 'lng', 'longitude', 'long', 'driver_y', 'driverY', 'vehicle_y', 'vehicleY']
+  );
+  if (nestedPoint) {
+    return nestedPoint;
+  }
+
+  return extractPointFromSourceByKeys(
+    source,
+    ['x', 'lat', 'latitude', 'driver_x', 'driverX', 'vehicle_x', 'vehicleX'],
+    ['y', 'lng', 'longitude', 'long', 'driver_y', 'driverY', 'vehicle_y', 'vehicleY']
+  );
+};
+
+const extractPickupPoint = (source) => {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const nestedPickupObject = findFirstObjectByKeys(source, ['pickup', 'pickup_location', 'pickupLocation', 'origin']);
+  const nestedPickupPoint = extractPointFromSourceByKeys(
+    nestedPickupObject,
+    ['x', 'lat', 'latitude', 'pickup_x', 'pickupX', 'pickup_lat', 'pickupLat'],
+    ['y', 'lng', 'longitude', 'long', 'pickup_y', 'pickupY', 'pickup_lng', 'pickupLng']
+  );
+  if (nestedPickupPoint) {
+    return nestedPickupPoint;
+  }
+
+  return extractPointFromSourceByKeys(
+    source,
+    ['pickup_x', 'pickupX', 'pickup_lat', 'pickupLat', 'origin_x', 'originX', 'from_x', 'fromX'],
+    ['pickup_y', 'pickupY', 'pickup_lng', 'pickupLng', 'origin_y', 'originY', 'from_y', 'fromY']
+  );
+};
+
+const extractDropoffPoint = (source) => {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const nestedDropoffObject = findFirstObjectByKeys(source, ['dropoff', 'dropoff_location', 'dropoffLocation', 'destination']);
+  const nestedDropoffPoint = extractPointFromSourceByKeys(
+    nestedDropoffObject,
+    ['x', 'lat', 'latitude', 'dropoff_x', 'dropoffX', 'dropoff_lat', 'dropoffLat'],
+    ['y', 'lng', 'longitude', 'long', 'dropoff_y', 'dropoffY', 'dropoff_lng', 'dropoffLng']
+  );
+  if (nestedDropoffPoint) {
+    return nestedDropoffPoint;
+  }
+
+  return extractPointFromSourceByKeys(
+    source,
+    ['dropoff_x', 'dropoffX', 'dropoff_lat', 'dropoffLat', 'destination_x', 'destinationX', 'to_x', 'toX'],
+    ['dropoff_y', 'dropoffY', 'dropoff_lng', 'dropoffLng', 'destination_y', 'destinationY', 'to_y', 'toY']
+  );
 };
 
 const toEtaText = (value) => {
@@ -107,8 +286,16 @@ const extractEtaText = (...sources) => {
       'eta',
       'etaText',
       'eta_text',
+      'eta_to_pickup',
+      'etaToPickup',
+      'eta_to_destination',
+      'etaToDestination',
       'estimated_time',
       'estimatedTime',
+      'time_to_pickup',
+      'timeToPickup',
+      'time_to_destination',
+      'timeToDestination',
       'arrival_time',
       'arrivalTime',
       'minutes_away',
@@ -332,10 +519,13 @@ const mergeDriverData = (...sources) => {
   return merged;
 };
 
-export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId }) => {
+export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId, pickup, dropoff }) => {
   const [driver, setDriver] = useState(null);
   const [etaText, setEtaText] = useState(null);
   const [rideStatusText, setRideStatusText] = useState('');
+  const [driverLocation, setDriverLocation] = useState(null);
+  const [pickupPoint, setPickupPoint] = useState(null);
+  const [dropoffPoint, setDropoffPoint] = useState(null);
 
   useEffect(() => {
     let pollingInterval;
@@ -368,12 +558,27 @@ export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId }) 
           return;
         }
 
+        const shouldTrackLiveRide = isDriverAssignedStatus(normalizedStatus);
+
         let driverPayload = null;
-        if (isDriverAssignedStatus(normalizedStatus)) {
-          try {
-            driverPayload = await getRideDriverDetails(currentRideId);
-          } catch (driverError) {
-            console.warn('Dedicated driver details endpoint failed:', driverError);
+        let locationPayload = null;
+
+        if (shouldTrackLiveRide) {
+          const [driverResult, locationResult] = await Promise.allSettled([
+            getRideDriverDetails(currentRideId),
+            getRideLocation(currentRideId),
+          ]);
+
+          if (driverResult.status === 'fulfilled') {
+            driverPayload = driverResult.value;
+          } else {
+            console.warn('Dedicated driver details endpoint failed:', driverResult.reason);
+          }
+
+          if (locationResult.status === 'fulfilled') {
+            locationPayload = locationResult.value;
+          } else {
+            console.warn('Ride location endpoint failed:', locationResult.reason);
           }
         }
 
@@ -389,8 +594,12 @@ export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId }) 
           || primaryDriverData?.plateNo
           || primaryDriverData?.vehicleText
         );
+        const hasLiveDriverLocation = Boolean(
+          extractDriverLocationPoint(locationPayload)
+          || extractDriverLocationPoint(statusPayload)
+        );
 
-        if (isDriverAssignedStatus(normalizedStatus) && (!hasPhone || !hasVehicleInfo)) {
+        if (shouldTrackLiveRide && (!hasPhone || !hasVehicleInfo || !hasLiveDriverLocation)) {
           try {
             fallbackRidePayload = await getRideDetailsByAnyEndpoint(currentRideId);
           } catch (fallbackError) {
@@ -409,8 +618,40 @@ export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId }) 
           previousDriver
         ));
 
+        setDriverLocation((previousDriverLocation) => {
+          const nextDriverLocation = pickFirstCoordinatePoint(
+            extractDriverLocationPoint(locationPayload),
+            extractDriverLocationPoint(statusPayload),
+            extractDriverLocationPoint(fallbackRidePayload),
+            previousDriverLocation
+          );
+          return nextDriverLocation || previousDriverLocation;
+        });
+
+        setPickupPoint((previousPickupPoint) => {
+          const nextPickupPoint = pickFirstCoordinatePoint(
+            pickup,
+            extractPickupPoint(statusPayload),
+            extractPickupPoint(locationPayload),
+            extractPickupPoint(fallbackRidePayload),
+            previousPickupPoint
+          );
+          return nextPickupPoint || previousPickupPoint;
+        });
+
+        setDropoffPoint((previousDropoffPoint) => {
+          const nextDropoffPoint = pickFirstCoordinatePoint(
+            dropoff,
+            extractDropoffPoint(statusPayload),
+            extractDropoffPoint(locationPayload),
+            extractDropoffPoint(fallbackRidePayload),
+            previousDropoffPoint
+          );
+          return nextDropoffPoint || previousDropoffPoint;
+        });
+
         setEtaText((previousEtaText) => {
-          const extractedEtaText = extractEtaText(driverPayload, statusPayload, fallbackRidePayload);
+          const extractedEtaText = extractEtaText(driverPayload, locationPayload, statusPayload, fallbackRidePayload);
           return extractedEtaText || previousEtaText || null;
         });
       } catch (error) {
@@ -429,7 +670,7 @@ export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId }) 
         clearInterval(pollingInterval);
       }
     };
-  }, [currentRideId, setCurrentScreen]);
+  }, [currentRideId, setCurrentScreen, pickup, dropoff]);
 
   const handleCallDriver = (event) => {
     event.stopPropagation();
@@ -446,12 +687,30 @@ export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId }) 
 
   const hasResolvedDriver = Boolean(driver?.name || driver?.vehicleMake || driver?.vehicleModel || driver?.plateNo || driver?.vehicleText || driver?.phone);
   const driverAssigned = isDriverAssignedStatus(rideStatusText);
+  const rideInProgress = isTripInProgressStatus(rideStatusText);
+  const liveRouteMode = driverAssigned ? (rideInProgress ? 'to_dropoff' : 'to_pickup') : null;
   const phoneNumber = String(driver?.phone || '').trim();
   const vehicleLabel = [driver?.vehicleMake, driver?.vehicleModel].filter(Boolean).join(' ').trim() || driver?.vehicleText || null;
+  const etaPhaseText = liveRouteMode === 'to_dropoff' ? 'To destination' : 'To pickup';
+  const resolvedPickupPoint = pickFirstCoordinatePoint(pickup, pickupPoint);
+  const resolvedDropoffPoint = pickFirstCoordinatePoint(dropoff, dropoffPoint);
 
   return (
     <div className="w-100 h-100 d-flex flex-column">
-      <MapPlaceholder onMenuClick={(event) => { event.stopPropagation(); onMenuClick && onMenuClick(event); }}>
+      <MapPlaceholder
+        onMenuClick={(event) => { event.stopPropagation(); onMenuClick && onMenuClick(event); }}
+        pickup={resolvedPickupPoint}
+        dropoff={resolvedDropoffPoint}
+        driverLocation={driverLocation}
+        liveRouteMode={liveRouteMode}
+        onRouteEtaCalculated={(routeEtaText) => {
+          if (!routeEtaText) {
+            return;
+          }
+
+          setEtaText((previousEtaText) => routeEtaText || previousEtaText || null);
+        }}
+      >
         <div className="overlay-drawer text-center p-4" onClick={(event) => event.stopPropagation()} style={{ cursor: 'default' }}>
           <div className="d-flex align-items-center justify-content-between mb-4">
             <div className="d-flex align-items-center">
@@ -483,6 +742,7 @@ export const DriverArrived = ({ setCurrentScreen, onMenuClick, currentRideId }) 
               <div className="text-success small fw-bold text-end">
                 <div className="mb-0" style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>ETA</div>
                 <div>{etaText || 'Updating'}</div>
+                <div style={{ fontSize: '0.65rem', color: '#999', fontWeight: 'normal' }}>{etaPhaseText}</div>
               </div>
             )}
           </div>

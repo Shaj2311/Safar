@@ -388,6 +388,32 @@ export const getRideDriverDetails = async (tripId) => {
     }
 };
 
+export const getRideLocation = async (tripId) => {
+    try {
+        const sessionKey = localStorage.getItem('sessionKey');
+        if (!tripId) {
+            throw new Error('Trip id is required to fetch ride location');
+        }
+
+        if (!sessionKey) {
+            throw new Error('Session key is required to fetch ride location');
+        }
+
+        const url = new URL(`${BASE_URL}/rides/${tripId}/location`, window.location.origin);
+        url.searchParams.append('sessionKey', sessionKey);
+
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+            throw new Error('Failed to fetch ride location');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("API Error: getRideLocation", error);
+        throw error;
+    }
+};
+
 export const getRidePaymentStatus = async (tripId) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');

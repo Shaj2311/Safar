@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, Marker, DirectionsRenderer } from '@react-google-maps/api';
 
 const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
@@ -14,10 +14,108 @@ const MAP_OPTIONS = {
   fullscreenControl: false,
 };
 
-export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRouteCalculated }) => {
-  const [currentLocation, setCurrentLocation] = useState(null);
+const buildPoint = (point) => {
+  if (!point) {
+    return null;
+  }
+
+  const lat = Number(point.lat);
+  const lng = Number(point.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return { lat, lng };
+};
+
+const toRadians = (value) => (value * Math.PI) / 180;
+
+const getDistanceKm = (pointA, pointB) => {
+  if (!pointA || !pointB) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const earthRadiusKm = 6371;
+  const deltaLat = toRadians(pointB.lat - pointA.lat);
+  const deltaLng = toRadians(pointB.lng - pointA.lng);
+  const latA = toRadians(pointA.lat);
+  const latB = toRadians(pointB.lat);
+
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
+    + Math.cos(latA) * Math.cos(latB) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+};
+
+const getNearestReferenceDistanceKm = (point, pickupPoint, dropoffPoint) => {
+  const referencePoints = [pickupPoint, dropoffPoint].filter(Boolean);
+  if (!point || referencePoints.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return Math.min(...referencePoints.map((referencePoint) => getDistanceKm(point, referencePoint)));
+};
+
+const resolveDriverPointAxis = (driverPoint, pickupPoint, dropoffPoint) => {
+  if (!driverPoint) {
+    return null;
+  }
+
+  const swappedPoint = buildPoint({ lat: driverPoint.lng, lng: driverPoint.lat });
+  if (!swappedPoint) {
+    return driverPoint;
+  }
+
+  const hasTripReferences = Boolean(pickupPoint || dropoffPoint);
+  if (hasTripReferences) {
+    const normalDistance = getNearestReferenceDistanceKm(driverPoint, pickupPoint, dropoffPoint);
+    const swappedDistance = getNearestReferenceDistanceKm(swappedPoint, pickupPoint, dropoffPoint);
+
+    if (swappedDistance + 1 < normalDistance) {
+      return swappedPoint;
+    }
+
+    return driverPoint;
+  }
+
+  return driverPoint;
+};
+
+export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRouteCalculated, onRouteEtaCalculated, driverLocation, liveRouteMode }) => {
+  const [currentLocation, setCurrentLocation] = useState(DEFAULT_CENTER);
   const [directions, setDirections] = useState(null);
   const mapRef = useRef(null);
+
+  const pickupPoint = useMemo(() => buildPoint(pickup), [pickup]);
+  const dropoffPoint = useMemo(() => buildPoint(dropoff), [dropoff]);
+  const liveDriverPoint = useMemo(() => buildPoint(driverLocation), [driverLocation]);
+  const resolvedDriverPoint = useMemo(
+    () => resolveDriverPointAxis(liveDriverPoint, pickupPoint, dropoffPoint),
+    [liveDriverPoint, pickupPoint, dropoffPoint]
+  );
+
+  const shouldTrackPickup = liveRouteMode === 'to_pickup';
+  const shouldTrackDropoff = liveRouteMode === 'to_dropoff';
+
+  const routeOrigin = useMemo(
+    () => (resolvedDriverPoint && (shouldTrackPickup || shouldTrackDropoff) ? resolvedDriverPoint : pickupPoint),
+    [resolvedDriverPoint, pickupPoint, shouldTrackPickup, shouldTrackDropoff]
+  );
+
+  const routeDestination = useMemo(() => {
+    if (resolvedDriverPoint && shouldTrackPickup) {
+      return pickupPoint;
+    }
+
+    if (resolvedDriverPoint && shouldTrackDropoff) {
+      return dropoffPoint;
+    }
+
+    return dropoffPoint;
+  }, [resolvedDriverPoint, shouldTrackPickup, shouldTrackDropoff, pickupPoint, dropoffPoint]);
 
   const onMapLoad = useCallback((map) => {
     mapRef.current = map;
@@ -30,31 +128,33 @@ export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRoute
         (pos) => setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
         () => setCurrentLocation(DEFAULT_CENTER)
       );
-    } else {
-      setCurrentLocation(DEFAULT_CENTER);
     }
   }, []);
 
-  // Dono locations select hone ke baad directions fetch karo
+  // Route draw karo: standard pickup->dropoff ya live driver tracking route
   useEffect(() => {
-    if (!pickup || !dropoff || !window.google) {
-      setDirections(null);
+    if (!routeOrigin || !routeDestination || !window.google) {
       return;
     }
 
     const directionsService = new window.google.maps.DirectionsService();
     directionsService.route(
       {
-        origin: { lat: pickup.lat, lng: pickup.lng },
-        destination: { lat: dropoff.lat, lng: dropoff.lng },
+        origin: { lat: routeOrigin.lat, lng: routeOrigin.lng },
+        destination: { lat: routeDestination.lat, lng: routeDestination.lng },
         travelMode: window.google.maps.TravelMode.DRIVING,
       },
       (result, status) => {
         if (status === 'OK' && result) {
           setDirections(result);
 
+          const routeLeg = result.routes?.[0]?.legs?.[0] || null;
+          if (onRouteEtaCalculated && routeLeg?.duration?.text) {
+            onRouteEtaCalculated(routeLeg.duration.text);
+          }
+
           // Fare calculate karo: distance (meters) / 1000 = km, then * 100
-          if (onRouteCalculated) {
+          if (onRouteCalculated && !resolvedDriverPoint) {
             const distanceMeters = result.routes[0].legs[0].distance.value;
             const distanceKm = distanceMeters / 1000;
             const fare = Math.ceil(distanceKm * 100);
@@ -64,8 +164,8 @@ export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRoute
           // Map ko route ke ird gird fit karo
           if (mapRef.current) {
             const bounds = new window.google.maps.LatLngBounds();
-            bounds.extend({ lat: pickup.lat, lng: pickup.lng });
-            bounds.extend({ lat: dropoff.lat, lng: dropoff.lng });
+            bounds.extend({ lat: routeOrigin.lat, lng: routeOrigin.lng });
+            bounds.extend({ lat: routeDestination.lat, lng: routeDestination.lng });
             mapRef.current.fitBounds(bounds, { top: 80, bottom: 300, left: 40, right: 40 });
           }
         } else {
@@ -74,19 +174,28 @@ export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRoute
         }
       }
     );
-  }, [pickup, dropoff, onRouteCalculated]);
+  }, [routeOrigin, routeDestination, onRouteCalculated, onRouteEtaCalculated, resolvedDriverPoint, liveRouteMode]);
 
   // Jab sirf pickup select hova ho toh map us pe center karo
   useEffect(() => {
-    if (mapRef.current && pickup && !dropoff) {
-      mapRef.current.panTo({ lat: pickup.lat, lng: pickup.lng });
+    if (mapRef.current && pickupPoint && !dropoffPoint && !resolvedDriverPoint) {
+      mapRef.current.panTo({ lat: pickupPoint.lat, lng: pickupPoint.lng });
       mapRef.current.setZoom(15);
     }
-  }, [pickup, dropoff]);
+  }, [pickupPoint, dropoffPoint, resolvedDriverPoint]);
 
-  const center = pickup
-    ? { lat: pickup.lat, lng: pickup.lng }
-    : currentLocation || DEFAULT_CENTER;
+  const center = routeOrigin && routeDestination
+    ? {
+      lat: (routeOrigin.lat + routeDestination.lat) / 2,
+      lng: (routeOrigin.lng + routeDestination.lng) / 2,
+    }
+    : resolvedDriverPoint
+      ? { lat: resolvedDriverPoint.lat, lng: resolvedDriverPoint.lng }
+      : pickupPoint
+        ? { lat: pickupPoint.lat, lng: pickupPoint.lng }
+        : currentLocation || DEFAULT_CENTER;
+
+  const directionsToRender = routeOrigin && routeDestination ? directions : null;
 
   return (
     <div className="map-placeholder w-100 h-100 d-flex flex-column position-relative">
@@ -113,30 +222,38 @@ export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRoute
           onLoad={onMapLoad}
         >
           {/* Current location marker (jab koi selection nahi) */}
-          {currentLocation && !pickup && (
+          {currentLocation && !pickupPoint && !resolvedDriverPoint && (
             <Marker position={currentLocation} />
           )}
 
           {/* Pickup marker */}
-          {pickup && (
+          {pickupPoint && (
             <Marker
-              position={{ lat: pickup.lat, lng: pickup.lng }}
+              position={{ lat: pickupPoint.lat, lng: pickupPoint.lng }}
               icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png' }}
             />
           )}
 
           {/* Dropoff marker */}
-          {dropoff && (
+          {dropoffPoint && (
             <Marker
-              position={{ lat: dropoff.lat, lng: dropoff.lng }}
+              position={{ lat: dropoffPoint.lat, lng: dropoffPoint.lng }}
               icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png' }}
             />
           )}
 
+          {/* Live driver marker */}
+          {resolvedDriverPoint && (
+            <Marker
+              position={{ lat: resolvedDriverPoint.lat, lng: resolvedDriverPoint.lng }}
+              icon={{ url: 'https://maps.google.com/mapfiles/kml/shapes/cabs.png' }}
+            />
+          )}
+
           {/* Route line */}
-          {directions && (
+          {directionsToRender && (
             <DirectionsRenderer
-              directions={directions}
+              directions={directionsToRender}
               options={{
                 suppressMarkers: true, // Humhare custom markers use karo
                 polylineOptions: {

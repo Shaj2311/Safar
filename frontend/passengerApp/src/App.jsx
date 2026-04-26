@@ -49,7 +49,7 @@ function App() {
       case 'searching':
         return <Searching setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} setCurrentRideId={setCurrentRideId} />;
       case 'driver-arrived':
-        return <DriverArrived setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} />;
+        return <DriverArrived setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} pickup={pickup} dropoff={dropoff} />;
       case 'trip-completed':
         return <TripCompleted setCurrentScreen={setCurrentScreen} onMenuClick={() => setIsSidebarOpen(true)} currentRideId={currentRideId} />;
       case 'rating':
