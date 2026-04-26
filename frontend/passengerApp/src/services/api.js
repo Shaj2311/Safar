@@ -253,13 +253,34 @@ export const getDriverProfile = async (driverId) => {
         const response = await fetch(`${BASE_URL}/users/${driverId}/profile?sessionKey=${sessionKey}`);
         
         if (!response.ok) {
-            throw new Error('Failed to fetch driver profile');
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch driver profile (users profile). status=${response.status}, body=${errorText}`);
         }
         
         return await response.json();
     } catch (error) {
         console.error("API Error: getDriverProfile", error);
         throw error;
+    }
+};
+
+export const getDriverProfileByAnyId = async (driverId) => {
+    const sessionKey = localStorage.getItem('sessionKey');
+
+    try {
+        return await getDriverProfile(driverId);
+    } catch (firstError) {
+        try {
+            const response = await fetch(`${BASE_URL}/drivers/me?sessionKey=${sessionKey}&id=${driverId}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Fallback driver profile endpoint failed. status=${response.status}, body=${errorText}`);
+            }
+            return await response.json();
+        } catch (secondError) {
+            console.error('API Error: getDriverProfileByAnyId', { firstError, secondError, driverId });
+            throw secondError;
+        }
     }
 };
 
@@ -302,5 +323,43 @@ export const getRideSummary = async (rideId) => {
         console.error("API Error: getRideSummary", error);
         throw error;
     }
+};
+
+const tryFetchJson = async (url) => {
+    const response = await fetch(url);
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`status=${response.status}, body=${errorText}`);
+    }
+    return await response.json();
+};
+
+export const getRideDetailsByAnyEndpoint = async (rideId) => {
+    const sessionKey = localStorage.getItem('sessionKey');
+    if (!sessionKey || !rideId) {
+        return null;
+    }
+
+    const endpoints = [
+        { name: 'historyRideDetails', url: `${BASE_URL}/history/rides/${rideId}?sessionKey=${sessionKey}` },
+        { name: 'callDetails', url: `${BASE_URL}/call?sessionKey=${sessionKey}&id=${rideId}` },
+    ];
+
+    let hasAnyData = false;
+    let mergedData = {};
+
+    for (const endpoint of endpoints) {
+        try {
+            const data = await tryFetchJson(endpoint.url);
+            if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+                hasAnyData = true;
+                mergedData = { ...mergedData, ...data };
+            }
+        } catch (error) {
+            console.warn(`getRideDetailsByAnyEndpoint: ${endpoint.name} failed`, error);
+        }
+    }
+
+    return hasAnyData ? mergedData : null;
 };
 
