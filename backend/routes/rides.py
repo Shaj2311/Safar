@@ -92,7 +92,7 @@ async def acceptRideRequest(sessionKey: str, id: int, db = Depends(get_db)):
         if check is not None:
             raise HTTPException(status_code=410, detail="ride already accepted")
             
-        # Acceptance logic: link driver and auto-create chat
+        # link driver and auto-create chat
         await conn.execute("update trip set driver_id = $1, updated_at = now() where trip_id = $2", userId, id)
         await conn.execute("insert into chat (trip_id) values ($1)", id)
         
@@ -166,6 +166,33 @@ async def confirmPayment(sessionKey: str, id: int, db = Depends(get_db)):
             raise HTTPException(status_code=404, detail="payment record not found")
             
         return {"id": id, "paymentStatus": "Paid"}
+
+
+@router.get("/{tripId}/driver")
+async def getCurrentDriver(sessionKey: str, tripId: int, db = Depends(get_db)):
+    """Called by passenger during an active/accepted ride to get driver and vehicle info"""
+    passengerId = validate_session(sessionKey)
+
+    async with db.acquire() as conn:
+        query = """
+            select u.name as driver_name, d.phone_no, v.make, v.model, v.plate_no
+            from trip t
+            join appuser u on t.driver_id = u.user_id
+            join driver d on t.driver_id = d.driver_id
+            left join vehicle v on d.driver_id = v.driver_id
+            where t.trip_id = $1
+            and t.passenger_id = $2
+            and t.is_deleted = false
+        """
+        driver_info = await conn.fetchrow(query, tripId, passengerId)
+        
+        if not driver_info:
+            raise HTTPException(
+                status_code=404, 
+                detail="Invalid ride or access unauthorized"
+            )
+
+        return dict(driver_info)
 
 
 @router.get("/{id}/summary")
