@@ -18,8 +18,6 @@ async def requestRide(sessionKey: str, rideDetails: RideRequest, db = Depends(ge
         if not is_passenger:
             raise HTTPException(status_code=403, detail="only passengers can request rides")
 
-        # Placeholder for distance calculation
-        estimated_dist = 0.0 
 
         # Insert trip
         query = """
@@ -34,7 +32,7 @@ async def requestRide(sessionKey: str, rideDetails: RideRequest, db = Depends(ge
                 rideDetails.pickup_y, 
                 rideDetails.dropoff_x, 
                 rideDetails.dropoff_y, 
-                estimated_dist
+                rideDetails.dist
                 )
 
         return {"status": "Ride requested", "tripId": trip_id}
