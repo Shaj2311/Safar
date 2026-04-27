@@ -48,8 +48,8 @@ async def signUpPassenger(details: PassengerSignup, db = Depends(get_db)):
 async def loginPassenger(details: User, db = Depends(get_db)):
     async with db.acquire() as conn:
         userId = await verify_credentials(conn, details)
-        # Verify if user exists in the passenger table
-        is_passenger = await conn.fetchval("select 1 from passenger where passenger_id = $1", userId)
+        # Verify if user exists in the passenger table and isn't deleted
+        is_passenger = await conn.fetchval("select 1 from passenger where passenger_id = $1 and is_deleted = false", userId)
         if not is_passenger:
             raise HTTPException(status_code=403, detail="user is not a passenger")
 
@@ -71,8 +71,8 @@ async def signUpDriver(details: DriverSignup, db = Depends(get_db)):
 async def loginDriver(details: User, db = Depends(get_db)):
     async with db.acquire() as conn:
         userId = await verify_credentials(conn, details)
-        # Verify role exists in the driver table
-        is_driver = await conn.fetchval("select 1 from driver where driver_id = $1", userId)
+        # Verify role exists in the driver table and isn't deleted
+        is_driver = await conn.fetchval("select 1 from driver where driver_id = $1 and is_deleted = false", userId)
         if not is_driver:
             raise HTTPException(status_code=403, detail="user is not a driver")
 
@@ -113,8 +113,8 @@ async def signUpSuperAdmin(details: SuperAdminSignup, db = Depends(get_db)):
 async def loginStaff(details: User, db = Depends(get_db)):
     async with db.acquire() as conn:
         userId = await verify_credentials(conn, details)
-        # Get specific role from staff table
-        staff_row = await conn.fetchrow("select role from staff where staff_id = $1", userId)
+        # Get specific role from staff table and isn't deleted
+        staff_row = await conn.fetchrow("select role from staff where staff_id = $1 and is_deleted = false", userId)
         if not staff_row:
             raise HTTPException(status_code=403, detail="user is not a staff member")
 

@@ -19,7 +19,6 @@ async def staffViewRides(sessionKey: str, searchStr: Optional[str] = None, statu
             left join payment p on t.trip_id = p.trip_id
             left join appuser u_p on t.passenger_id = u_p.user_id
             left join appuser u_d on t.driver_id = u_d.user_id
-            where t.is_deleted = false
         """
         params = []
         counter = 1
