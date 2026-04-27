@@ -20,6 +20,8 @@ const ActiveRides = () => {
   const [selectedRide, setSelectedRide] = useState(null);
   const dropdownRef = useRef(null);
 
+
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -124,6 +126,8 @@ const ActiveRides = () => {
     }
   };
 
+
+
   return (
     <div>
       {error && (
@@ -184,8 +188,8 @@ const ActiveRides = () => {
                       <span className="fw-bold fs-5 text-dark">Rs. {selectedRide.fare}</span>
                     </div>
                   </div>
+                  </div>
                 </div>
-              </div>
               <div className="modal-footer border-top-0 pt-0">
                 <button type="button" className="btn btn-secondary rounded-3 px-4 fw-medium" onClick={() => setSelectedRide(null)}>Close</button>
               </div>
