@@ -21,12 +21,11 @@ export const Login = ({ setCurrentScreen }) => {
       } else {
         await loginRequest({ name, password });
       }
-      // Save name so sidebar can show the logged-in user's name
       localStorage.setItem('passengerName', name);
       setLoading(false);
       setCurrentScreen('home');
     } catch (err) {
-      setError(isSignup ? 'Sign-up failed. Please check your details.' : 'Login failed. Please check your credentials.');
+      setError(isSignup ? 'Sign-up failed. Check your details.' : 'Login failed. Check your credentials.');
       setLoading(false);
     }
   };
@@ -36,11 +35,7 @@ export const Login = ({ setCurrentScreen }) => {
       <div className="safar-logo-container">
         <div className="safar-logo">
           <div className="d-flex align-items-center">
-            <img
-              src="/safar-logo.svg"
-              alt="Safar Logo"
-              style={{ height: '100px' }}
-            />
+            <img src="/safar-logo.svg" alt="Safar Logo" style={{ height: '100px' }} />
           </div>
         </div>
       </div>
@@ -89,11 +84,7 @@ export const Login = ({ setCurrentScreen }) => {
         />
 
         <div className="mt-4 mb-5">
-          <button
-            type="submit"
-            className="btn btn-safar-primary w-100"
-            disabled={loading}
-          >
+          <button type="submit" className="btn btn-safar-primary w-100" disabled={loading}>
             {loading ? 'Processing...' : (isSignup ? 'Sign Up' : 'Log In')}
           </button>
         </div>

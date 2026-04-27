@@ -23,7 +23,6 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentRideId, setCurrentRideId] = useState(null);
 
-  // Lifted state for mapping and routing
   const [pickup, setPickup] = useState(null);
   const [dropoff, setDropoff] = useState(null);
 
