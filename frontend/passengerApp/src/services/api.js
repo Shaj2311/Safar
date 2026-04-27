@@ -8,45 +8,28 @@ export const extractRideIdFromPayload = (payload) => {
     while (queue.length > 0) {
         const current = queue.shift();
 
-        if (current === null || current === undefined) {
-            continue;
-        }
+        if (current === null || current === undefined) continue;
 
-        if (typeof current === 'number' && Number.isFinite(current)) {
-            return current;
-        }
+        if (typeof current === 'number' && Number.isFinite(current)) return current;
 
         if (typeof current === 'string') {
             const numericValue = Number(current);
-            if (!Number.isNaN(numericValue) && Number.isFinite(numericValue)) {
-                return numericValue;
-            }
+            if (!Number.isNaN(numericValue) && Number.isFinite(numericValue)) return numericValue;
             continue;
         }
 
-        if (typeof current !== 'object') {
-            continue;
-        }
-
-        if (visited.has(current)) {
-            continue;
-        }
+        if (typeof current !== 'object' || visited.has(current)) continue;
         visited.add(current);
 
         if (Array.isArray(current)) {
-            for (const item of current) {
-                queue.push(item);
-            }
+            for (const item of current) queue.push(item);
             continue;
         }
 
         for (const key of candidateKeys) {
             if (Object.prototype.hasOwnProperty.call(current, key)) {
-                const value = current[key];
-                const numericValue = Number(value);
-                if (!Number.isNaN(numericValue) && Number.isFinite(numericValue)) {
-                    return numericValue;
-                }
+                const numericValue = Number(current[key]);
+                if (!Number.isNaN(numericValue) && Number.isFinite(numericValue)) return numericValue;
             }
         }
 
@@ -56,7 +39,6 @@ export const extractRideIdFromPayload = (payload) => {
             }
         }
     }
-
     return null;
 };
 
@@ -64,23 +46,19 @@ export const loginRequest = async (credentials) => {
     try {
         const response = await fetch(`${BASE_URL}/auth/login/passenger`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(credentials), // API ko sirf name aur password chahiye
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(credentials),
         });
         
-        if (!response.ok) {
-            throw new Error('Login failed');
-        }
+        if (!response.ok) throw new Error('Login failed');
         
         const data = await response.json();
-        if (data.sessionKey) {
-            localStorage.setItem('sessionKey', data.sessionKey);
-        }
+        const token = data.sessionKey || data.session_key || data.token;
+        
+        if (token) localStorage.setItem('sessionKey', token);
         return data;
     } catch (error) {
-        console.error("API Error: loginRequest", error);
+        console.error("Login failed:", error);
         throw error;
     }
 };
@@ -89,25 +67,19 @@ export const signupPassenger = async (userData) => {
     try {
         const response = await fetch(`${BASE_URL}/auth/signup/passenger`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(userData), // Naya user bananay ke liye ye details zaroori hain
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData),
         });
         
-        if (!response.ok) {
-            throw new Error('Signup failed');
-        }
-        
+        if (!response.ok) throw new Error('Signup failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: signupPassenger", error);
+        console.error("Signup failed:", error);
         throw error;
     }
 };
+
 export const getNearbyDrivers = async (location) => {
-    console.log("Mock API: getNearbyDrivers triggered with location", location);
-    // Abhi asal endpoint nahi hai, is liye yeh mock function rakha hai taake app crash na ho
     return new Promise((resolve) => setTimeout(() => resolve({ drivers: [] }), 1000));
 };
 
@@ -115,25 +87,18 @@ export const createRideRequest = async (rideDetails) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
         const url = new URL(`${BASE_URL}/rides/`, window.location.origin);
-        if (sessionKey) {
-            url.searchParams.append('sessionKey', sessionKey);
-        }
+        if (sessionKey) url.searchParams.append('sessionKey', sessionKey);
 
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(rideDetails), // Ride start aur drop location coordinates
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(rideDetails),
         });
 
-        if (!response.ok) {
-            throw new Error('Failed to request ride');
-        }
-
+        if (!response.ok) throw new Error('Request failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: createRideRequest", error);
+        console.error("Ride request failed:", error);
         throw error;
     }
 };
@@ -142,12 +107,10 @@ export const getRideStatus = async (rideId) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
         const response = await fetch(`${BASE_URL}/rides/${rideId}?sessionKey=${sessionKey}`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch ride status');
-        }
+        if (!response.ok) throw new Error('Status fetch failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: getRideStatus", error);
+        console.error("Status check failed:", error);
         throw error;
     }
 };
@@ -155,9 +118,7 @@ export const getRideStatus = async (rideId) => {
 export const findActiveRideId = async () => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
-        if (!sessionKey) {
-            return null;
-        }
+        if (!sessionKey) return null;
 
         const endpoints = [
             `${BASE_URL}/rides/?sessionKey=${sessionKey}`,
@@ -166,30 +127,16 @@ export const findActiveRideId = async () => {
 
         for (const endpoint of endpoints) {
             try {
-                const response = await fetch(endpoint, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
-
-                if (!response.ok) {
-                    continue;
-                }
+                const response = await fetch(endpoint);
+                if (!response.ok) continue;
 
                 const data = await response.json();
                 const rideId = extractRideIdFromPayload(data);
-                if (rideId) {
-                    return rideId;
-                }
-            } catch (innerError) {
-                console.warn('findActiveRideId endpoint failed:', endpoint, innerError);
-            }
+                if (rideId) return rideId;
+            } catch (e) {}
         }
-
         return null;
     } catch (error) {
-        console.error('API Error: findActiveRideId', error);
         return null;
     }
 };
@@ -198,24 +145,13 @@ export const cancelRideRequest = async (rideId) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
         const url = new URL(`${BASE_URL}/rides/${rideId}/cancel`, window.location.origin);
-        if (sessionKey) {
-            url.searchParams.append('sessionKey', sessionKey);
-        }
+        if (sessionKey) url.searchParams.append('sessionKey', sessionKey);
 
-        const response = await fetch(url, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to cancel ride');
-        }
-
+        const response = await fetch(url, { method: 'PATCH' });
+        if (!response.ok) throw new Error('Cancellation failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: cancelRideRequest", error);
+        console.error("Cancel failed:", error);
         throw error;
     }
 };
@@ -224,25 +160,18 @@ export const submitRideRating = async (rideId, rating) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
         const url = new URL(`${BASE_URL}/rides/${rideId}/rate`, window.location.origin);
-        if (sessionKey) {
-            url.searchParams.append('sessionKey', sessionKey);
-        }
+        if (sessionKey) url.searchParams.append('sessionKey', sessionKey);
 
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ score: rating })
         });
 
-        if (!response.ok) {
-            throw new Error('Failed to submit rating');
-        }
-
+        if (!response.ok) throw new Error('Rating failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: submitRideRating", error);
+        console.error("Rating submission failed:", error);
         throw error;
     }
 };
@@ -251,35 +180,25 @@ export const getDriverProfile = async (driverId) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
         const response = await fetch(`${BASE_URL}/users/${driverId}/profile?sessionKey=${sessionKey}`);
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to fetch driver profile (users profile). status=${response.status}, body=${errorText}`);
-        }
-        
+        if (!response.ok) throw new Error('Profile fetch failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: getDriverProfile", error);
+        console.error("Driver profile error:", error);
         throw error;
     }
 };
 
 export const getDriverProfileByAnyId = async (driverId) => {
     const sessionKey = localStorage.getItem('sessionKey');
-
     try {
         return await getDriverProfile(driverId);
-    } catch (firstError) {
+    } catch (e) {
         try {
             const response = await fetch(`${BASE_URL}/drivers/me?sessionKey=${sessionKey}&id=${driverId}`);
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Fallback driver profile endpoint failed. status=${response.status}, body=${errorText}`);
-            }
+            if (!response.ok) throw new Error('Fallback failed');
             return await response.json();
-        } catch (secondError) {
-            console.error('API Error: getDriverProfileByAnyId', { firstError, secondError, driverId });
-            throw secondError;
+        } catch (err) {
+            throw err;
         }
     }
 };
@@ -288,25 +207,18 @@ export const updatePassengerProfile = async (profileData) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
         const url = new URL(`${BASE_URL}/users/me/passenger`, window.location.origin);
-        if (sessionKey) {
-            url.searchParams.append('sessionKey', sessionKey);
-        }
+        if (sessionKey) url.searchParams.append('sessionKey', sessionKey);
 
         const response = await fetch(url, {
             method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(profileData)
         });
 
-        if (!response.ok) {
-            throw new Error('Failed to update profile');
-        }
-
+        if (!response.ok) throw new Error('Profile update failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: updatePassengerProfile", error);
+        console.error("Profile update error:", error);
         throw error;
     }
 };
@@ -315,75 +227,46 @@ export const getRideSummary = async (rideId) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
         const response = await fetch(`${BASE_URL}/rides/${rideId}/summary?sessionKey=${sessionKey}`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch ride summary');
-        }
+        if (!response.ok) throw new Error('Summary fetch failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: getRideSummary", error);
+        console.error("Ride summary error:", error);
         throw error;
     }
 };
 
-const tryFetchJson = async (url) => {
-    const response = await fetch(url);
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`status=${response.status}, body=${errorText}`);
-    }
-    return await response.json();
-};
-
 export const getRideDetailsByAnyEndpoint = async (rideId) => {
     const sessionKey = localStorage.getItem('sessionKey');
-    if (!sessionKey || !rideId) {
-        return null;
-    }
+    if (!sessionKey || !rideId) return null;
 
     const endpoints = [
-        { name: 'historyRideDetails', url: `${BASE_URL}/history/rides/${rideId}?sessionKey=${sessionKey}` },
-        { name: 'callDetails', url: `${BASE_URL}/call?sessionKey=${sessionKey}&id=${rideId}` },
+        `${BASE_URL}/history/rides/${rideId}?sessionKey=${sessionKey}`,
+        `${BASE_URL}/call?sessionKey=${sessionKey}&id=${rideId}`,
     ];
 
-    let hasAnyData = false;
     let mergedData = {};
-
-    for (const endpoint of endpoints) {
+    for (const url of endpoints) {
         try {
-            const data = await tryFetchJson(endpoint.url);
-            if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-                hasAnyData = true;
-                mergedData = { ...mergedData, ...data };
-            }
-        } catch (error) {
-            console.warn(`getRideDetailsByAnyEndpoint: ${endpoint.name} failed`, error);
-        }
+            const response = await fetch(url);
+            if (!response.ok) continue;
+            const data = await response.json();
+            if (data) mergedData = { ...mergedData, ...data };
+        } catch (e) {}
     }
-
-    return hasAnyData ? mergedData : null;
+    return Object.keys(mergedData).length > 0 ? mergedData : null;
 };
 
 export const getRideDriverDetails = async (tripId) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
-        if (!tripId) {
-            throw new Error('Trip id is required to fetch driver details');
-        }
-
-        if (!sessionKey) {
-            throw new Error('Session key is required to fetch driver details');
-        }
-
         const url = new URL(`${BASE_URL}/rides/${tripId}/driver`, window.location.origin);
         url.searchParams.append('sessionKey', sessionKey);
 
         const response = await fetch(url.toString());
-        if (!response.ok) {
-            throw new Error('Failed to fetch ride driver details');
-        }
+        if (!response.ok) throw new Error('Driver details failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: getRideDriverDetails", error);
+        console.error("Ride driver details error:", error);
         throw error;
     }
 };
@@ -391,25 +274,14 @@ export const getRideDriverDetails = async (tripId) => {
 export const getRideLocation = async (tripId) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
-        if (!tripId) {
-            throw new Error('Trip id is required to fetch ride location');
-        }
-
-        if (!sessionKey) {
-            throw new Error('Session key is required to fetch ride location');
-        }
-
         const url = new URL(`${BASE_URL}/rides/${tripId}/location`, window.location.origin);
         url.searchParams.append('sessionKey', sessionKey);
 
         const response = await fetch(url.toString());
-        if (!response.ok) {
-            throw new Error('Failed to fetch ride location');
-        }
-
+        if (!response.ok) throw new Error('Location fetch failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: getRideLocation", error);
+        console.error("Ride location error:", error);
         throw error;
     }
 };
@@ -417,26 +289,14 @@ export const getRideLocation = async (tripId) => {
 export const getRidePaymentStatus = async (tripId) => {
     try {
         const sessionKey = localStorage.getItem('sessionKey');
-        if (!tripId) {
-            throw new Error('Trip id is required to fetch payment status');
-        }
-
-        if (!sessionKey) {
-            throw new Error('Session key is required to fetch payment status');
-        }
-
         const url = new URL(`${BASE_URL}/rides/${tripId}/paymentStatus`, window.location.origin);
         url.searchParams.append('sessionKey', sessionKey);
 
         const response = await fetch(url.toString());
-        if (!response.ok) {
-            throw new Error('Failed to fetch ride payment status');
-        }
-
+        if (!response.ok) throw new Error('Payment status failed');
         return await response.json();
     } catch (error) {
-        console.error("API Error: getRidePaymentStatus", error);
+        console.error("Ride payment status error:", error);
         throw error;
     }
 };
-

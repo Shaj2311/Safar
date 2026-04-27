@@ -131,6 +131,8 @@ export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRoute
     }
   }, []);
 
+  const hasFitBoundsForMode = useRef(null);
+
   // Route draw karo: standard pickup->dropoff ya live driver tracking route
   useEffect(() => {
     if (!routeOrigin || !routeDestination || !window.google) {
@@ -153,7 +155,7 @@ export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRoute
             onRouteEtaCalculated(routeLeg.duration.text);
           }
 
-          // Fare calculate karo: distance (meters) / 1000 = km, then * 100
+          // Fare calculate karo
           if (onRouteCalculated && !resolvedDriverPoint) {
             const distanceMeters = result.routes[0].legs[0].distance.value;
             const distanceKm = distanceMeters / 1000;
@@ -161,12 +163,13 @@ export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRoute
             onRouteCalculated(fare);
           }
 
-          // Map ko route ke ird gird fit karo
-          if (mapRef.current) {
+          // Map ko route ke ird gird fit karo - ONLY ONCE per mode to prevent jumpiness
+          if (mapRef.current && hasFitBoundsForMode.current !== liveRouteMode) {
             const bounds = new window.google.maps.LatLngBounds();
             bounds.extend({ lat: routeOrigin.lat, lng: routeOrigin.lng });
             bounds.extend({ lat: routeDestination.lat, lng: routeDestination.lng });
             mapRef.current.fitBounds(bounds, { top: 80, bottom: 300, left: 40, right: 40 });
+            hasFitBoundsForMode.current = liveRouteMode;
           }
         } else {
           console.error('Directions failed:', status);
@@ -184,16 +187,8 @@ export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRoute
     }
   }, [pickupPoint, dropoffPoint, resolvedDriverPoint]);
 
-  const center = routeOrigin && routeDestination
-    ? {
-      lat: (routeOrigin.lat + routeDestination.lat) / 2,
-      lng: (routeOrigin.lng + routeDestination.lng) / 2,
-    }
-    : resolvedDriverPoint
-      ? { lat: resolvedDriverPoint.lat, lng: resolvedDriverPoint.lng }
-      : pickupPoint
-        ? { lat: pickupPoint.lat, lng: pickupPoint.lng }
-        : currentLocation || DEFAULT_CENTER;
+  // Removed dynamic center calculation to prevent perspective shifting.
+  // fitBounds and user panning will now control the view.
 
   const directionsToRender = routeOrigin && routeDestination ? directions : null;
 
@@ -216,7 +211,7 @@ export const MapPlaceholder = ({ children, onMenuClick, pickup, dropoff, onRoute
       <div className="position-absolute w-100 h-100 top-0 start-0" style={{ zIndex: 1 }}>
         <GoogleMap
           mapContainerStyle={MAP_CONTAINER_STYLE}
-          center={center}
+          defaultCenter={DEFAULT_CENTER}
           zoom={14}
           options={MAP_OPTIONS}
           onLoad={onMapLoad}
