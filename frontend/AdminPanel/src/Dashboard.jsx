@@ -79,7 +79,7 @@ const Dashboard = () => {
                 <span className="text-secondary fs-5">🚗</span>
               </div>
               <h3 className="card-title fw-bold mb-1">
-                {loading ? '...' : kpis.totalRides.toLocaleString()}
+                {loading ? 'Loading' : kpis.totalRides.toLocaleString()}
               </h3>
             </div>
           </div>
@@ -92,7 +92,7 @@ const Dashboard = () => {
                 <span className="text-secondary fs-5">🎫</span>
               </div>
               <h3 className="card-title fw-bold mb-1">
-                {loading ? '...' : kpis.supportTickets.toLocaleString()}
+                {loading ? 'Loading' : kpis.supportTickets.toLocaleString()}
               </h3>
             </div>
           </div>
@@ -105,7 +105,7 @@ const Dashboard = () => {
                 <span className="text-secondary fs-5">👤</span>
               </div>
               <h3 className="card-title fw-bold mb-1">
-                {loading ? '...' : kpis.activeCaptains}
+                {loading ? 'Loading' : kpis.activeCaptains}
               </h3>
             </div>
           </div>
@@ -118,7 +118,7 @@ const Dashboard = () => {
                 <span className="text-secondary fs-5">👥</span>
               </div>
               <h3 className="card-title fw-bold mb-1">
-                {loading ? '...' : kpis.totalPassengers.toLocaleString()}
+                {loading ? 'Loading' : kpis.totalPassengers.toLocaleString()}
               </h3>
             </div>
           </div>

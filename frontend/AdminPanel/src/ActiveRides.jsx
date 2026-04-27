@@ -2,15 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from './services/api';
 
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const geocodeCache = new Map();
+
 const ActiveRides = () => {
   const navigate = useNavigate();
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedRide, setSelectedRide] = useState(null);
   const dropdownRef = useRef(null);
@@ -25,39 +30,67 @@ const ActiveRides = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    const fetchRides = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await api.get('/staff/rides');
-        const rawRides = Array.isArray(response.data) ? response.data : (response.data.rides || response.data.data || []);
+  const reverseGeocode = async (lat, lng) => {
+    const cacheKey = `${lat},${lng}`;
+    if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey);
 
-        const mappedRides = rawRides.map(ride => {
-          const pickupStr = ride.pickup ? (ride.pickup.address || `${ride.pickup.x?.toFixed(4)}, ${ride.pickup.y?.toFixed(4)}`) : 'Unknown';
-          const dropoffStr = ride.dropoff ? (ride.dropoff.address || `${ride.dropoff.x?.toFixed(4)}, ${ride.dropoff.y?.toFixed(4)}`) : 'Unknown';
-
-          return {
-            id: `#TRP-${ride.tripId ?? ride.id ?? '???'}`,
-            rawId: ride.tripId ?? ride.id,
-            passenger: (typeof ride.passenger === 'string' ? ride.passenger : ride.passenger?.name) || 'Unknown',
-            captain: (typeof ride.driver === 'string' ? ride.driver : ride.driver?.name) || 'Unassigned',
-            pickup: pickupStr,
-            dropoff: dropoffStr,
-            status: String(ride.status || ride.state || 'Pending'),
-            fare: ride.fare ?? ride.price ?? 0
-          };
-        });
-
-        setRides(mappedRides);
-      } catch (err) {
-        setError(`Failed to fetch rides: ${err.response?.status ? `Server error ${err.response.status}` : err.message}`);
-      } finally {
-        setLoading(false);
+    try {
+      const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`);
+      const data = await res.json();
+      if (data.results && data.results[0]) {
+        const address = data.results[0].formatted_address;
+        geocodeCache.set(cacheKey, address);
+        return address;
       }
-    };
+      return `${lat}, ${lng}`;
+    } catch {
+      return `${lat}, ${lng}`;
+    }
+  };
 
+  const fetchRides = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await api.get('/staff/rides');
+      const rawRides = Array.isArray(response.data) ? response.data : (response.data.rides || response.data.data || []);
+
+      const mappedRides = rawRides.map(ride => ({
+        id: `#TRP-${ride.tripId ?? ride.id ?? '??'}`,
+        rawId: ride.tripId ?? ride.id,
+        passenger: (typeof ride.passenger === 'string' ? ride.passenger : ride.passenger?.name) || 'Unknown',
+        captain: (typeof ride.driver === 'string' ? ride.driver : ride.driver?.name) || 'Unassigned',
+        pickup: ride.pickup?.address || (ride.pickup ? 'Resolving location' : 'Unknown'),
+        dropoff: ride.dropoff?.address || (ride.dropoff ? 'Resolving location' : 'Unknown'),
+        rawPickup: ride.pickup,
+        rawDropoff: ride.dropoff,
+        status: String(ride.status || ride.state || 'Pending'),
+        fare: ride.fare ?? ride.price ?? 0
+      }));
+
+      setRides(mappedRides);
+
+      // Start background resolution for coordinates
+      mappedRides.forEach(async (ride) => {
+        if (ride.rawPickup && !ride.rawPickup.address && ride.rawPickup.x) {
+          const addr = await reverseGeocode(ride.rawPickup.x, ride.rawPickup.y);
+          setRides(prev => prev.map(r => r.rawId === ride.rawId ? { ...r, pickup: addr } : r));
+        }
+        if (ride.rawDropoff && !ride.rawDropoff.address && ride.rawDropoff.x) {
+          const addr = await reverseGeocode(ride.rawDropoff.x, ride.rawDropoff.y);
+          setRides(prev => prev.map(r => r.rawId === ride.rawId ? { ...r, dropoff: addr } : r));
+        }
+      });
+
+    } catch (err) {
+      setError(`Failed to fetch rides: ${err.response?.status ? `Server error ${err.response.status}` : err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchRides();
   }, []);
 
