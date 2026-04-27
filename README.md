@@ -36,6 +36,11 @@ To run this project locally, do the following:
 ```
 git clone https://github.com/Shaj2311/Safar
 cd Safar
+```
+Next, make a .env file that has the following line:
+`VITE_GOOGLE_MAPS_API_KEY=[YOUR GOOGLE MAPS API KEY]`
+Run the following:
+```
 docker compose up -d --build
 ```
 Then, visit the following to view their respective applications
