@@ -34,8 +34,7 @@ const Login = ({ onLogin }) => {
         }
         onLogin();
       } else {
-        console.warn("Login payload received:", response.data);
-        setError('Login successful, but no valid token was found in the response. Check console.');
+        setError('Login successful, but the session token is missing. Please contact support.');
       }
       
     } catch (err) {

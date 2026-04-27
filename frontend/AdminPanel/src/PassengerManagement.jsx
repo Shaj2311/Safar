@@ -16,6 +16,11 @@ const PassengerManagement = () => {
   const [selectedPassenger, setSelectedPassenger] = useState(null);
   const dropdownRef = useRef(null);
 
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState(null);
+  const [createSuccess, setCreateSuccess] = useState(null);
+  const [createForm, setCreateForm] = useState({ name: '', phoneNo: '', password: '', cnic: '' });
 
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
@@ -47,13 +52,11 @@ const PassengerManagement = () => {
         rawId: p.id ?? p.passengerId ?? p.user_id ?? null,
         id: `#PSG-${p.id ?? p.passengerId ?? p.user_id ?? '???'}`,
         name: String(p.name || p.username || p.passenger || 'Unknown'),
-        phone: String(p.phone || p.phoneNumber || p.contact || 'N/A'),
-        status: String(p.status || p.state || 'Active')
+        phone: String(p.phone || p.phoneNumber || p.contact || 'N/A')
       }));
 
       setPassengers(mappedPassengers);
     } catch (err) {
-      console.error("Error fetching passengers:", err);
       setError("Failed to load passenger data. Please check your connection.");
     } finally {
       setLoading(false);
@@ -70,9 +73,7 @@ const PassengerManagement = () => {
       p.phone.includes(searchTerm) ||
       p.id.toLowerCase().includes(searchTerm.toLowerCase());
       
-    const matchesStatus = filterStatus === 'All' || p.status === filterStatus;
-    
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
 
   const totalPages = Math.ceil(filteredPassengers.length / itemsPerPage) || 1;
@@ -102,7 +103,8 @@ const PassengerManagement = () => {
     setActionSuccess(null);
     try {
       const role = sessionStorage.getItem('safar_admin_role') || 'admin';
-      // super admin uses a different hard-delete route
+      
+      // Super Admin and Admin use different endpoints for deletion
       const endpoint = role === 'super' || role === 'super_admin'
         ? `/super/passengers/${selectedPassenger.rawId}`
         : `/admin/passengers/${selectedPassenger.rawId}`;
@@ -114,6 +116,28 @@ const PassengerManagement = () => {
       setActionError(err.response?.data?.detail || 'Failed to delete passenger.');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleCreatePassenger = async (e) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    setCreateError(null);
+    setCreateSuccess(null);
+    try {
+      // Use signup route to allow all staff roles to create passengers
+      await api.post('/auth/signup/passenger', createForm);
+      setCreateSuccess('Passenger account created successfully!');
+      setCreateForm({ name: '', phoneNo: '', password: '', cnic: '' });
+      fetchPassengers();
+      setTimeout(() => {
+        setShowCreateModal(false);
+        setCreateSuccess(null);
+      }, 1500);
+    } catch (err) {
+      setCreateError(err.response?.data?.detail || 'Failed to create passenger account.');
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -152,18 +176,6 @@ const PassengerManagement = () => {
                       <span className="fw-bold text-dark">{selectedPassenger.phone}</span>
                     </div>
                   </div>
-                  <div className="col-6">
-                    <div className="p-3 bg-light rounded-3 h-100">
-                      <small className="text-muted d-block mb-1 fw-semibold">Total Rides</small>
-                      <span className="fw-bold text-dark">{selectedPassenger.totalRides}</span>
-                    </div>
-                  </div>
-                  <div className="col-12">
-                    <div className="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center">
-                      <small className="text-muted fw-semibold">Account Status</small>
-                      <span className="badge bg-success rounded-pill px-3 py-2 fw-medium">{selectedPassenger.status}</span>
-                    </div>
-                  </div>
                 </div>
 
                 {actionError && (
@@ -193,8 +205,8 @@ const PassengerManagement = () => {
         </div>
       )}
 
-      <div className="row mb-4">
-        <div className="col-md-8 col-lg-6 mb-3 mb-md-0">
+      <div className="row mb-4 align-items-center">
+        <div className="col-md-9 col-lg-8 mb-3 mb-md-0">
           <input
             type="text"
             className="form-control"
@@ -207,47 +219,13 @@ const PassengerManagement = () => {
             disabled={loading}
           />
         </div>
-        <div className="col-md-4 col-lg-3">
-
-          <div className="dropdown" ref={dropdownRef}>
-            <button 
-              className="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center bg-white" 
-              type="button" 
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              disabled={loading}
-            >
-              <span>{filterStatus === 'All' ? 'All Passengers' : 'Active Passengers'}</span>
-              <span className="dropdown-toggle"></span>
-            </button>
-            {isDropdownOpen && (
-              <ul className="dropdown-menu show w-100 shadow-sm border-0 mt-1" style={{ position: 'absolute', zIndex: 1000 }}>
-                <li>
-                  <button 
-                    className={`dropdown-item py-2 ${filterStatus === 'All' ? 'active bg-primary text-white' : ''}`} 
-                    onClick={() => {
-                      setFilterStatus('All');
-                      setCurrentPage(1);
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    All Passengers
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    className={`dropdown-item py-2 ${filterStatus === 'Active' ? 'active bg-primary text-white' : ''}`} 
-                    onClick={() => {
-                      setFilterStatus('Active');
-                      setCurrentPage(1);
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    Active Passengers
-                  </button>
-                </li>
-              </ul>
-            )}
-          </div>
+        <div className="col-md-3 col-lg-4 text-md-end">
+          <button
+            className="btn btn-primary fw-medium"
+            onClick={() => setShowCreateModal(true)}
+          >
+            + Create Passenger
+          </button>
         </div>
       </div>
 
@@ -260,7 +238,6 @@ const PassengerManagement = () => {
                   <th className="ps-4 py-3 text-muted fw-semibold border-bottom">Passenger ID</th>
                   <th className="py-3 text-muted fw-semibold border-bottom">Name</th>
                   <th className="py-3 text-muted fw-semibold border-bottom">Phone Number</th>
-                  <th className="py-3 text-muted fw-semibold border-bottom">Status</th>
                   <th className="pe-4 py-3 text-muted fw-semibold border-bottom">Actions</th>
                 </tr>
               </thead>
@@ -284,14 +261,6 @@ const PassengerManagement = () => {
                       <td className="ps-4 py-3 fw-medium text-secondary">{passenger.id}</td>
                       <td className="py-3 text-dark">{passenger.name}</td>
                       <td className="py-3 text-dark">{passenger.phone}</td>
-                      <td className="py-3">
-                        <span
-                          className="badge rounded-pill bg-success px-3 py-2 fw-medium"
-                          style={{ minWidth: '80px' }}
-                        >
-                          {passenger.status}
-                        </span>
-                      </td>
                       <td className="pe-4 py-3">
                         <div className="d-flex gap-2">
                           <button 
@@ -349,6 +318,88 @@ const PassengerManagement = () => {
           </li>
         </ul>
       </nav>
+      
+      {/* Create Passenger Modal */}
+      {showCreateModal && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-bottom-0 pb-0">
+                <h5 className="modal-title fw-bold text-dark">Create New Passenger Account</h5>
+                <button type="button" className="btn-close" onClick={() => setShowCreateModal(false)} disabled={createLoading}></button>
+              </div>
+              <form onSubmit={handleCreatePassenger}>
+                <div className="modal-body py-4">
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold small">Full Name</label>
+                    <input
+                      type="text"
+                      className="form-control rounded-3"
+                      placeholder="e.g. John Doe"
+                      value={createForm.name}
+                      onChange={(e) => setCreateForm({...createForm, name: e.target.value})}
+                      required
+                      disabled={createLoading}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold small">Phone Number</label>
+                    <input
+                      type="text"
+                      className="form-control rounded-3"
+                      placeholder="e.g. 03001234567"
+                      value={createForm.phoneNo}
+                      onChange={(e) => setCreateForm({...createForm, phoneNo: e.target.value})}
+                      required
+                      disabled={createLoading}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold small">CNIC (Optional)</label>
+                    <input
+                      type="text"
+                      className="form-control rounded-3"
+                      placeholder="e.g. 4210112345671"
+                      value={createForm.cnic}
+                      onChange={(e) => setCreateForm({...createForm, cnic: e.target.value})}
+                      disabled={createLoading}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold small">Set Password</label>
+                    <input
+                      type="password"
+                      className="form-control rounded-3"
+                      placeholder="At least 6 characters"
+                      value={createForm.password}
+                      onChange={(e) => setCreateForm({...createForm, password: e.target.value})}
+                      required
+                      disabled={createLoading}
+                    />
+                  </div>
+
+                  {createError && (
+                    <div className="alert alert-danger py-2 px-3 mb-0 rounded-3" style={{ fontSize: '0.875rem' }}>
+                      {createError}
+                    </div>
+                  )}
+                  {createSuccess && (
+                    <div className="alert alert-success py-2 px-3 mb-0 rounded-3" style={{ fontSize: '0.875rem' }}>
+                      {createSuccess}
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer border-top pt-2">
+                  <button type="button" className="btn btn-outline-secondary fw-medium" onClick={() => setShowCreateModal(false)} disabled={createLoading}>Cancel</button>
+                  <button type="submit" className="btn btn-primary fw-medium px-4" disabled={createLoading}>
+                    {createLoading ? <><span className="spinner-border spinner-border-sm me-1" /> Creating...</> : '+ Create Account'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

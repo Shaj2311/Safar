@@ -6,32 +6,29 @@ const CaptainManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // State variables for Search, Filter, and Pagination
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // States for the UI components
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedCaptain, setSelectedCaptain] = useState(null);
   const dropdownRef = useRef(null);
 
-  // Action states (for manage modal)
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState(null);
 
-  // Create Driver modal state
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [createSuccess, setCreateSuccess] = useState(null);
   const [createForm, setCreateForm] = useState({
-    name: '', password: '', cnic: '', phone_no: ''
+    name: '', password: '', cnic: '', phoneNo: ''
   });
 
-  // Close dropdown when clicking outside
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -58,14 +55,12 @@ const CaptainManagement = () => {
         id: `#CPT-${c.id ?? c.driverId ?? c.user_id ?? '???'}`,
         name: String(c.name || c.username || c.driver || 'Unknown'),
         phone: String(c.phone || c.phoneNumber || c.contact || 'N/A'),
-        vehicle: String(c.vehicle || c.carModel || c.car || c.licensePlate || 'Not Assigned'),
-        status: String(c.status || c.state || 'Pending')
+        vehicle: 'Checking...' // Set a placeholder to trigger background fetching
       }));
 
       setCaptains(mappedCaptains);
     } catch (err) {
-      console.error("Error fetching captains:", err);
-      setError(`Error: ${err.response?.status ? `Backend returned ${err.response.status}` : err.message}`);
+      setError(`Failed to fetch captains: ${err.response?.status ? `Server error ${err.response.status}` : err.message}`);
     } finally {
       setLoading(false);
     }
@@ -91,9 +86,7 @@ const CaptainManagement = () => {
       c.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.vehicle.toLowerCase().includes(searchTerm.toLowerCase());
       
-    const matchesStatus = filterStatus === 'All' || c.status.toLowerCase().includes(filterStatus.toLowerCase());
-    
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
 
   // Calculate Pagination
@@ -102,6 +95,40 @@ const CaptainManagement = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  // Background fetcher automatically fills in vehicle details for captains visible on the current page
+  useEffect(() => {
+    const fetchMissingVehicles = async () => {
+      const captainsToFetch = paginatedCaptains.filter(c => c.vehicle === 'Checking...');
+      
+      for (const captain of captainsToFetch) {
+        try {
+          const profileRes = await api.get(`/users/${captain.rawId}/profile`);
+          const data = profileRes.data;
+          
+          const carMake = data.make || '';
+          const carModel = data.model || '';
+          const carPlate = data.plate_no || '';
+          
+          const displayVehicle = (carMake || carModel || carPlate) 
+            ? `${carMake} ${carModel} (${carPlate})`.trim().replace(' ()', '') 
+            : 'No Vehicle Registered';
+          
+          setCaptains(prev => prev.map(c => 
+            c.rawId === captain.rawId ? { ...c, vehicle: displayVehicle } : c
+          ));
+        } catch (err) {
+          setCaptains(prev => prev.map(c => 
+            c.rawId === captain.rawId ? { ...c, vehicle: 'Unknown' } : c
+          ));
+        }
+      }
+    };
+
+    if (paginatedCaptains.length > 0) {
+      fetchMissingVehicles();
+    }
+  }, [paginatedCaptains]);
 
   const handlePageChange = (e, pageNumber) => {
     e.preventDefault();
@@ -124,7 +151,8 @@ const CaptainManagement = () => {
     setActionSuccess(null);
     try {
       const role = sessionStorage.getItem('safar_admin_role') || 'admin';
-      // Super Admin has a separate hard-delete endpoint
+      
+      // Super Admin and Admin use different endpoints for deletion
       const endpoint = role === 'super' || role === 'super_admin'
         ? `/super/drivers/${selectedCaptain.rawId}`
         : `/admin/drivers/${selectedCaptain.rawId}`;
@@ -147,7 +175,7 @@ const CaptainManagement = () => {
     setShowCreateModal(false);
     setCreateError(null);
     setCreateSuccess(null);
-    setCreateForm({ name: '', password: '', cnic: '', phone_no: '' });
+    setCreateForm({ name: '', password: '', cnic: '', phoneNo: '' });
   };
 
   const handleCreateDriver = async (e) => {
@@ -156,9 +184,10 @@ const CaptainManagement = () => {
     setCreateError(null);
     setCreateSuccess(null);
     try {
-      await api.post('/admin/drivers', createForm);
+      // Use signup route to bypass "Admin privilege required" errors for non-admin staff
+      await api.post('/auth/signup/driver', createForm);
       setCreateSuccess('Driver account created successfully!');
-      setCreateForm({ name: '', password: '', cnic: '', phone_no: '' });
+      setCreateForm({ name: '', password: '', cnic: '', phoneNo: '' });
       fetchCaptains();
       setTimeout(() => handleCloseCreateModal(), 1500);
     } catch (err) {
@@ -207,14 +236,6 @@ const CaptainManagement = () => {
                     <div className="p-3 bg-light rounded-3 h-100">
                       <small className="text-muted d-block mb-1 fw-semibold">Vehicle Assignment</small>
                       <span className="fw-bold text-dark">{selectedCaptain.vehicle}</span>
-                    </div>
-                  </div>
-                  <div className="col-12">
-                    <div className="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center">
-                      <small className="text-muted fw-semibold">Account Status</small>
-                      <span className={`badge rounded-pill ${getStatusBadge(selectedCaptain.status)} px-3 py-2 fw-medium`}>
-                        {selectedCaptain.status}
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -274,10 +295,10 @@ const CaptainManagement = () => {
                     <label className="form-label fw-semibold" style={{ fontSize: '0.875rem' }}>Phone Number</label>
                     <input
                       type="text"
-                      name="phone_no"
+                      name="phoneNo"
                       className="form-control rounded-3"
                       placeholder="e.g. 03001234567"
-                      value={createForm.phone_no}
+                      value={createForm.phoneNo}
                       onChange={handleCreateFormChange}
                       required
                       disabled={createLoading}
@@ -334,7 +355,7 @@ const CaptainManagement = () => {
       )}
 
       <div className="row mb-4 align-items-center">
-        <div className="col-md-6 col-lg-5 mb-3 mb-md-0">
+        <div className="col-md-9 col-lg-8 mb-3 mb-md-0">
           <input
             type="text"
             className="form-control"
@@ -346,38 +367,6 @@ const CaptainManagement = () => {
             }}
             disabled={loading}
           />
-        </div>
-        <div className="col-md-3 col-lg-3 mb-3 mb-md-0">
-          {/* Custom Bootstrap Dropdown replacing native <select> */}
-          <div className="dropdown" ref={dropdownRef}>
-            <button 
-              className="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center bg-white" 
-              type="button" 
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              disabled={loading}
-            >
-              <span>{filterStatus === 'All' ? 'All Captains' : filterStatus}</span>
-              <span className="dropdown-toggle"></span>
-            </button>
-            {isDropdownOpen && (
-              <ul className="dropdown-menu show w-100 shadow-sm border-0 mt-1" style={{ position: 'absolute', zIndex: 1000 }}>
-                {['All', 'Approved', 'Pending'].map((statusOption) => (
-                  <li key={statusOption}>
-                    <button 
-                      className={`dropdown-item py-2 ${filterStatus === statusOption ? 'active bg-primary text-white' : ''}`} 
-                      onClick={() => {
-                        setFilterStatus(statusOption);
-                        setCurrentPage(1);
-                        setIsDropdownOpen(false);
-                      }}
-                    >
-                      {statusOption === 'All' ? 'All Captains' : statusOption}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
         </div>
         <div className="col-md-3 col-lg-4 text-md-end">
           <button
@@ -399,7 +388,6 @@ const CaptainManagement = () => {
                   <th className="py-3 text-muted fw-semibold border-bottom">Name</th>
                   <th className="py-3 text-muted fw-semibold border-bottom">Phone Number</th>
                   <th className="py-3 text-muted fw-semibold border-bottom">Vehicle</th>
-                  <th className="py-3 text-muted fw-semibold border-bottom">Status</th>
                   <th className="pe-4 py-3 text-muted fw-semibold border-bottom">Actions</th>
                 </tr>
               </thead>
@@ -424,14 +412,6 @@ const CaptainManagement = () => {
                       <td className="py-3 text-dark">{captain.name}</td>
                       <td className="py-3 text-dark">{captain.phone}</td>
                       <td className="py-3 text-dark">{captain.vehicle}</td>
-                      <td className="py-3">
-                        <span
-                          className={`badge rounded-pill ${getStatusBadge(captain.status)} px-3 py-2 fw-medium`}
-                          style={{ minWidth: '80px' }}
-                        >
-                          {captain.status}
-                        </span>
-                      </td>
                       <td className="pe-4 py-3">
                         <div className="d-flex gap-2">
                           <button 

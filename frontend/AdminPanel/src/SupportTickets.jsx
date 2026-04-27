@@ -49,7 +49,6 @@ const SupportTickets = () => {
         const reporterName = t.tripId ? `Trip #${t.tripId}` : (t.staffId ? `Staff #${t.staffId}` : 'Unknown User');
 
         let cleanDate = String(t.date || t.created_at || t.createdAt || 'Recent');
-        // backend sometimes sends microseconds, trim them off
         if (cleanDate.includes('.')) cleanDate = cleanDate.split('.')[0];
 
         const rawId = t.ticketId ?? t.id ?? t.ticket_id ?? null;
@@ -66,7 +65,7 @@ const SupportTickets = () => {
 
       setTickets(mappedTickets);
     } catch (err) {
-      setError(`Error: ${err.response?.status ? `Backend returned ${err.response.status}` : err.message}`);
+      setError(`Failed to fetch tickets: ${err.response?.status ? `Server error ${err.response.status}` : err.message}`);
     } finally {
       setLoading(false);
     }
@@ -80,7 +79,7 @@ const SupportTickets = () => {
     if (location.state?.prefillTripId) {
       setCreateForm(prev => ({ ...prev, trip_id: location.state.prefillTripId }));
       setShowCreateModal(true);
-      // clear state so it doesn't reopen on refresh
+      
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
