@@ -28,7 +28,8 @@ Full API documentation is available at http://34.31.187.1:8000/redoc
 
 ## Try It Out
 Try out the passenger app [here](http://safarpassenger.syedhaiderali.com)<br>
-Visit the admin panel [here](http://safaradmin.syedhaiderali.com)
+Visit the admin panel [here](http://safaradmin.syedhaiderali.com)<br>
+Try out the driver app [here](http://safardriver.syedhaiderali.com)
 
 ## Local Testing
 To run this project locally, do the following:
