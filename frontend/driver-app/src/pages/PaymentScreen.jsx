@@ -1,11 +1,24 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { apiClient } from '../api/apiClient';
 import '../App.css';
 
 const PaymentScreen = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const ride = location.state?.ride;
+
+    const handlePaymentReceived = async () => {
+        try {
+            // Hit the backend to confirm payment
+            await apiClient.post(`/rides/${ride.tripId}/confirm-payment`);
+
+            // Navigate back to the Home screen
+            navigate('/home');
+        } catch (err) {
+            console.error('Error confirming payment:', err);
+        }
+    };
 
     return (
         <div className="mobile-frame" style={{ backgroundColor: '#ffffff' }}>
@@ -18,14 +31,14 @@ const PaymentScreen = () => {
                         Amount Due
                     </div>
                     <div style={{ color: '#0f766e', fontWeight: '900', fontSize: '4rem', letterSpacing: '-1px' }}>
-                        {ride?.price || 'Rs 0'}
+                        Rs {ride?.dist ? ride.dist * 100 : 200}
                     </div>
                 </div>
 
                 {/* Bottom Button */}
                 <button
                     className="btn w-100 shadow-sm btn-safar-primary"
-                    onClick={() => navigate('/home')}
+                    onClick={handlePaymentReceived}
                     style={{ padding: '16px', fontWeight: 'bold', fontSize: '1.2rem', borderRadius: '25px' }}
                 >
                     Payment Received

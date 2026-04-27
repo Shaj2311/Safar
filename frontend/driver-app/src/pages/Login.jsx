@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../api/apiClient';
 import '../App.css';
 
 
@@ -20,11 +21,63 @@ const Login = () => {
         setLoading(true);
         setError(null);
 
-        // Dummy login logic so you can test the Home screen layout
-        setTimeout(() => {
-            setLoading(false);
+        if (isSignup) {
+            try {
+                await apiClient.post('/auth/signup/driver', {
+                    name: identifier,
+                    password: password,
+                    phoneNo: phoneNo,
+                    cnic: cnic
+                });
+
+                // Clear the signup form and toggle UI back to "Login"
+                setIdentifier('');
+                setPassword('');
+                setPhoneNo('');
+                setCnic('');
+                setIsSignup(false);
+                setError(null);
+            } catch (err) {
+                const errorMsg = err.response?.data?.message ||
+                    (typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'Signup failed. Please try again.');
+                setError(errorMsg);
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
+        try {
+            const response = await apiClient.post('/auth/login/driver', {
+                name: identifier,
+                password: password
+            });
+
+
+            console.log("FULL LOGIN RESPONSE:", response.data);
+
+            const token = response.data?.sessionKey || response.data?.token || (typeof response.data === 'string' ? response.data : null);
+
+            const driverId = response.data?.userId;
+
+            if (token) localStorage.setItem('authToken', token);
+
+            if (driverId) {
+                localStorage.setItem('driverId', driverId);
+                console.log("ID successfully saved to storage:", driverId);
+            } else {
+                console.error("ERROR: The backend did NOT send a driver ID!");
+            }
+
             navigate('/home');
-        }, 500);
+        } catch (err) {
+            const errorMsg = err.response?.data?.message ||
+                (typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'Login failed. Please check your credentials.');
+            setError(errorMsg);
+        } finally {
+            setLoading(false);
+        }
+
     };
 
     return (
@@ -102,7 +155,7 @@ const Login = () => {
                                 disabled={loading}
                                 style={{ padding: '14px', fontSize: '1.1rem' }}
                             >
-                                {loading ? 'Processing...' : (isSignup ? 'Sign Up' : 'Log In')}
+                                {loading ? (isSignup ? 'Creating Account...' : 'Processing...') : (isSignup ? 'Sign Up' : 'Log In')}
                             </button>
                         </div>
 

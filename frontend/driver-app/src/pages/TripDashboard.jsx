@@ -1,19 +1,101 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import { apiClient } from '../api/apiClient';
 import '../App.css';
+
+const containerStyle = {
+    width: '100%',
+    height: '100%'
+};
 
 const TripDashboard = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const ride = location.state?.ride;
 
-    const [tripState, setTripState] = useState('start'); // 'start' or 'end'
+    const [isStarted, setIsStarted] = useState(false);
+    const [pickupAddress, setPickupAddress] = useState('Fetching...');
+    const [dropoffAddress, setDropoffAddress] = useState('Fetching...');
 
-    const handleAction = () => {
-        if (tripState === 'start') {
-            setTripState('end');
-        } else {
-            navigate('/trip-summary', { state: { ride } });
+    const { isLoaded } = useJsApiLoader({
+        id: 'google-map-script',
+        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    });
+    const mapCenter = {
+        lat: ride?.pickup?.x || 31.5204,
+        lng: ride?.pickup?.y || 74.3587
+    };
+
+    // Reverse Geocoding Logic
+    useEffect(() => {
+        if (isLoaded && ride) {
+            const geocoder = new window.google.maps.Geocoder();
+            // Reverse Geocode Pickup
+            geocoder.geocode({ location: { lat: ride.pickup.x, lng: ride.pickup.y } }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    setPickupAddress(results[0].formatted_address);
+                } else {
+                    setPickupAddress(`Lat: ${ride.pickup.x}, Lng: ${ride.pickup.y}`);
+                }
+            });
+            // Reverse Geocode Dropoff
+            geocoder.geocode({ location: { lat: ride.dropoff.x, lng: ride.dropoff.y } }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    setDropoffAddress(results[0].formatted_address);
+                } else {
+                    setDropoffAddress(`Lat: ${ride.dropoff.x}, Lng: ${ride.dropoff.y}`);
+                }
+            });
+        }
+    }, [isLoaded, ride]);
+
+    // Live Tracking System
+    useEffect(() => {
+        let watchId = null;
+
+        if (isStarted && ride?.tripId) {
+            console.log("Starting Live Tracking for Trip:", ride.tripId);
+
+            watchId = navigator.geolocation.watchPosition(
+                async (position) => {
+                    const { latitude, longitude } = position.coords;
+                    try {
+                        await apiClient.post(`/rides/${ride.tripId}/location`, {
+                            x: latitude,
+                            y: longitude
+                        });
+                        console.log("Location sent:", { latitude, longitude });
+                    } catch (err) {
+                        console.error("Failed to send location:", err);
+                    }
+                },
+                (err) => console.error("Geolocation error:", err),
+                { enableHighAccuracy: true, distanceFilter: 10 }
+            );
+        }
+
+        return () => {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                console.log("Tracking Stopped.");
+            }
+        };
+    }, [isStarted, ride?.tripId]);
+
+    const handleRideAction = async () => {
+        try {
+            if (!isStarted) {
+                // Hit the backend to start the ride
+                await apiClient.patch(`/rides/${ride.tripId}/start`);
+                setIsStarted(true);
+            } else {
+                // Hit the backend to end the ride
+                await apiClient.patch(`/rides/${ride.tripId}/end`);
+                navigate('/trip-summary', { state: { ride } });
+            }
+        } catch (err) {
+            console.error('Error updating ride status:', err);
         }
     };
 
@@ -23,67 +105,101 @@ const TripDashboard = () => {
             <div style={{ position: 'relative', height: '100%', width: '100%', overflow: 'hidden', backgroundColor: '#cbd5e1', display: 'flex', flexDirection: 'column' }}>
 
                 {/* Fixed Map Area */}
-                <div style={{ position: 'relative', flex: '1 1 auto', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                    <span style={{ fontSize: '40px' }}>📍</span>
+                <div style={{ position: 'relative', flex: '1 1 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 0 }}>
+                    {isLoaded ? (
+                        <GoogleMap
+                            mapContainerStyle={containerStyle}
+                            center={mapCenter}
+                            zoom={15}
+                            options={{ disableDefaultUI: true, zoomControl: false }}
+                        >
+                            <Marker position={mapCenter} />
+                        </GoogleMap>
+                    ) : (
+                        <div style={{ fontWeight: 'bold', color: '#4b5563' }}>Loading Map...</div>
+                    )}
                 </div>
 
                 {/* Status Bar for Trip */}
                 <div style={{ backgroundColor: '#8bdabe', padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 'bold', color: '#111827', fontSize: '0.95rem' }}>Trip in Progress</span>
-                    <span style={{ fontWeight: 'bold', color: '#111827', fontSize: '0.95rem' }}>{ride?.distance || '3.1 km left'}</span>
+                    <span style={{ fontWeight: 'bold', color: '#111827', fontSize: '0.95rem' }}>{isStarted ? 'Trip in Progress' : 'Head to Pickup'}</span>
+                    <span style={{ fontWeight: 'bold', color: '#111827', fontSize: '0.95rem' }}>{ride?.dist ?? 0} km left</span>
                 </div>
 
                 {/* Bottom Section (White) */}
                 <div style={{ backgroundColor: '#fff', display: 'flex', flexDirection: 'column', height: '42%', zIndex: 10 }}>
+                    <style>
+                        {`
+                            .hide-scrollbar::-webkit-scrollbar {
+                                display: none;
+                            }
+                            .hide-scrollbar {
+                                -ms-overflow-style: none;
+                                scrollbar-width: none;
+                            }
+                        `}
+                    </style>
 
-                    {/* Passenger Info */}
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '24px' }}>
-                        {/* Avatar */}
-                        <div style={{
-                            width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#cdd3ff',
-                            display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#111827', fontWeight: 'bold', fontSize: '1.25rem', marginRight: '16px'
-                        }}>
-                            {ride?.riderName ? ride.riderName.charAt(0).toUpperCase() : 'A'}
-                        </div>
+                    {/* Passenger Info (Fixed) */}
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '24px', flexShrink: 0 }}>
                         {/* Name */}
                         <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 'bold', color: '#111827', fontSize: '1.05rem', lineHeight: '1.2' }}>
-                                {ride?.riderName || 'Passenger'}
+                                Passenger ID: {ride?.passengerId || ride?.id || 'N/A'}
                             </div>
                             <div style={{ color: '#6b7280', fontSize: '0.9rem' }}>Passenger</div>
                         </div>
                         {/* Actions */}
                         <div style={{ display: 'flex', gap: '10px' }}>
                             <div style={{ width: '45px', height: '45px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '0.8rem', fontWeight: '600', color: '#111827' }}>Text</div>
-                            <div style={{ width: '45px', height: '45px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '0.8rem', fontWeight: '600', color: '#111827' }}>Call</div>
+                            <div
+                                onClick={() => navigate('/call', { state: { ride } })}
+                                style={{ width: '45px', height: '45px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '0.8rem', fontWeight: '600', color: '#111827', cursor: 'pointer' }}
+                            >
+                                Call
+                            </div>
                         </div>
                     </div>
 
-                    {/* Destination Card */}
-                    <div style={{ backgroundColor: '#f3f4f6', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* Destination Card (Scrollable Middle) */}
+                    <div
+                        className="hide-scrollbar"
+                        style={{
+                            backgroundColor: '#f3f4f6',
+                            padding: '16px 24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            overflowY: 'auto',
+                            flex: 1
+                        }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div style={{ fontSize: '0.85rem', color: '#4b5563', width: '80px' }}>Pickup</div>
-                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.95rem', textAlign: 'right' }}>{ride?.pickup || 'Pickup Location'}</div>
+                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.90rem', textAlign: 'right', flex: 1 }}>
+                                {pickupAddress}
+                            </div>
                         </div>
                         <div style={{ borderTop: '1px solid #e5e7eb', width: '100%', margin: '4px 0' }}></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div style={{ fontSize: '0.85rem', color: '#4b5563', width: '80px' }}>Dropoff</div>
-                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.95rem', textAlign: 'right' }}>{ride?.dropoff || 'Dropoff Location'}</div>
+                            <div style={{ fontWeight: '600', color: '#111827', fontSize: '0.90rem', textAlign: 'right', flex: 1 }}>
+                                {dropoffAddress}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Action Button */}
-                    <div style={{ padding: '24px', marginTop: 'auto', paddingBottom: '35px' }}>
+                    {/* Action Button (Fixed Bottom) */}
+                    <div style={{ padding: '24px', marginTop: 'auto', paddingBottom: '35px', flexShrink: 0 }}>
                         <button
                             className="btn w-100 shadow-sm"
-                            onClick={handleAction}
+                            onClick={handleRideAction}
                             style={{
-                                backgroundColor: tripState === 'start' ? '#20c997' : '#ef4444',
-                                color: tripState === 'start' ? '#1F2937' : '#ffffff',
+                                backgroundColor: isStarted ? '#ef4444' : '#20c997',
+                                color: isStarted ? '#ffffff' : '#1F2937',
                                 borderRadius: '25px', padding: '16px', fontWeight: 'bold', fontSize: '1.2rem', border: 'none'
                             }}
                         >
-                            {tripState === 'start' ? 'Start Ride' : 'End Trip'}
+                            {isStarted ? 'End Ride' : 'Start Ride'}
                         </button>
                     </div>
                 </div>
