@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       host: '0.0.0.0',
-      //allowedHosts: [''], 
+      allowedHosts: ['safardriver.syedhaiderali.com'], 
       port: 5175,
       proxy: {
         '/api': {
