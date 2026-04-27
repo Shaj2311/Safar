@@ -27,7 +27,7 @@ const DriverProfile = () => {
                     const ratingRes = await apiClient.get(`/users/${myId}/ratings`);
                     console.log("Rating Data:", ratingRes.data);
                     // Update state with rating if it exists
-                    profileData.rating = ratingRes.data?.rating || ratingRes.data?.averageRating || null;
+                    profileData.rating = ratingRes.data?.average_rating || null;
                 } catch (ratingErr) {
                     console.error("Error fetching ratings (non-blocking):", ratingErr);
                 }
