@@ -397,6 +397,7 @@ const extractDriverDataFromSource = (source) => {
       'carType',
     ])
     : findFirstValueByKeys(source, [
+      'make',
       'vehicle_make',
       'vehicleMake',
       'car_make',
@@ -420,6 +421,7 @@ const extractDriverDataFromSource = (source) => {
       'carName',
     ])
     : findFirstValueByKeys(source, [
+      'model',
       'vehicle_model',
       'vehicleModel',
       'car_model',
