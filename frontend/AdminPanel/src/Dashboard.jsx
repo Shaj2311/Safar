@@ -39,7 +39,6 @@ const Dashboard = () => {
           passenger: (typeof ride.passenger === 'string' ? ride.passenger : ride.passenger?.name) || 'Unknown',
           captain: (typeof ride.driver === 'string' ? ride.driver : ride.driver?.name) || 'Unassigned',
           status: ride.status || 'Pending',
-          // using ?? so a valid 0 fare doesnt get overriden
           fare: ride.fare ?? ride.price ?? 0
         }));
 

@@ -35,7 +35,6 @@ const ActiveRides = () => {
         const rawRides = Array.isArray(response.data) ? response.data : (response.data.rides || response.data.data || []);
 
         const mappedRides = rawRides.map(ride => {
-          // pickup/dropoff can come back as an object with address or coords
           const pickupStr = ride.pickup ? (ride.pickup.address || `${ride.pickup.x?.toFixed(4)}, ${ride.pickup.y?.toFixed(4)}`) : 'Unknown';
           const dropoffStr = ride.dropoff ? (ride.dropoff.address || `${ride.dropoff.x?.toFixed(4)}, ${ride.dropoff.y?.toFixed(4)}`) : 'Unknown';
 
@@ -53,7 +52,7 @@ const ActiveRides = () => {
 
         setRides(mappedRides);
       } catch (err) {
-        setError(`Error: ${err.response?.status ? `Backend returned ${err.response.status}` : err.message}`);
+        setError(`Failed to fetch rides: ${err.response?.status ? `Server error ${err.response.status}` : err.message}`);
       } finally {
         setLoading(false);
       }
@@ -256,7 +255,7 @@ const ActiveRides = () => {
                         </span>
                       </td>
                       <td className="py-3 text-dark fw-medium">
-                        {ride.fare > 0 ? `Rs. ${ride.fare}` : '—'}
+                        {ride.fare > 0 ? `Rs. ${ride.fare}` : '0'}
                       </td>
                       <td className="pe-4 py-3">
                         <div className="d-flex gap-2">

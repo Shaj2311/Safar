@@ -28,7 +28,6 @@ const defaultRoute = (role) => {
   return '/dashboard';
 };
 
-// bounces the user away if they dont have the right role
 const RoleGuard = ({ allowedRoles, children }) => {
   const role = getRole();
   if (!allowedRoles.includes(role)) {

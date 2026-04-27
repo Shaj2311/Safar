@@ -40,19 +40,16 @@ const StaffManagement = () => {
   const fetchStaff = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
-      
       const response = await api.get('/super/staff');
-      console.log('DEBUG: Raw Staff Data from Backend:', response.data);
       const rawStaff = Array.isArray(response.data) ? response.data : (response.data.staff || []);
 
       const mappedStaff = rawStaff.map(s => ({
-        rawId: s.id ?? s.staff_id ?? s.userId ?? s.user_id, // prioritize 'id' if it exists
+        rawId: s.id ?? s.staff_id ?? s.userId ?? s.user_id,
         id: `#STF-${s.staff_id || s.id}`,
         name: s.name,
         phone: s.phone_no,
         cnic: s.cnic,
-        role: s.role // 'admin' or 'support'
+        role: s.role
       }));
 
       setStaff(mappedStaff);
@@ -133,7 +130,6 @@ const StaffManagement = () => {
     <div>
       {error && <div className="alert alert-danger mb-4">{error}</div>}
 
-      {/* Manage Staff Modal */}
       {selectedStaff && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered">
@@ -190,7 +186,6 @@ const StaffManagement = () => {
         </div>
       )}
 
-      {/* Create Staff Modal */}
       {showCreateModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered">
@@ -243,7 +238,6 @@ const StaffManagement = () => {
         </div>
       )}
 
-      {/* Main UI Controls */}
       <div className="row mb-4 align-items-center">
         <div className="col-md-5 mb-3 mb-md-0">
           <input
@@ -318,7 +312,6 @@ const StaffManagement = () => {
         </div>
       </div>
 
-      {/* Pagination */}
       <nav>
         <ul className="pagination justify-content-end">
           <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
