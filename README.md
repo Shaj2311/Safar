@@ -37,8 +37,26 @@ To run this project locally, do the following:
 git clone https://github.com/Shaj2311/Safar
 cd Safar
 ```
+
+Next, create and set up your .env files.<br>
+The db/.env file should look like:
+```
+POSTGRES_USER=your_user
+POSTGRES_PASSWORD=your_password
+POSTGRES_DB=your_db
+DATABASE_HOST=database
+DATABASE_PORT=5432
+```
+
 Next, make a .env file that has the following line:
-`VITE_GOOGLE_MAPS_API_KEY=[YOUR GOOGLE MAPS API KEY]`
+```
+VITE_GOOGLE_MAPS_API_KEY=[YOUR GOOGLE MAPS API KEY]
+```
+and copy it into the following directories:<br>
+`frontend/passengerApp`<br>
+`frontend/driver-app`<br>
+`frontend/AdminPanel`<br>
+
 Run the following:
 ```
 docker compose up -d --build
