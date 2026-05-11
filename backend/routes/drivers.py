@@ -4,25 +4,23 @@ from state import sessions
 
 router = APIRouter(prefix="/drivers", tags=["Drivers"])
 
+# ── Migration Summary ──────────────────────────────────────────────
+# Views: v_driver_public_profile, v_incoming_ride_requests
+# Procedures: None (all endpoints are read-only)
+# Triggers: N/A (no writes in this file)
+# ───────────────────────────────────────────────────────────────────
+
 @router.get("/me")
 async def getDriverProfile(sessionKey: str, id: int, db = Depends(get_db)):
     sessionUserId = validate_session(sessionKey)
-
-    # check if the session belongs to the id requested
     if sessionUserId != id:
         raise HTTPException(status_code=403, detail="forbidden")
 
     async with db.acquire() as conn:
-        query = """
-            select d.driver_id, u.name, d.cnic, d.phone_no
-            from driver d
-            join appuser u on d.driver_id = u.user_id
-            where d.driver_id = $1 and d.is_deleted = false
-        """
-        profile = await conn.fetchrow(query, id)
+        profile = await conn.fetchrow(
+            "SELECT * FROM v_driver_public_profile WHERE driver_id = $1", id)
         if not profile:
             raise HTTPException(status_code=404, detail="driver not found")
-
         return {
                 "driverId": profile["driver_id"],
                 "name": profile["name"],
@@ -34,27 +32,16 @@ async def getDriverProfile(sessionKey: str, id: int, db = Depends(get_db)):
 @router.get("/incomingRequests")
 async def checkIncomingRequests(sessionKey: str, db = Depends(get_db)):
     validate_session(sessionKey)
-
     async with db.acquire() as conn:
-        query = """
-            select t.trip_id, t.passenger_id, a.name, p.phone_no, t.pickup_loc, t.dropoff_loc, t.estimated_dist
-            from trip t
-            join appuser a on t.passenger_id = a.user_id
-            join passenger p on t.passenger_id = p.passenger_id
-            where t.driver_id is null and t.is_deleted = false
-        """
-        rows = await conn.fetch(query)
-
-        # Point conversion
+        rows = await conn.fetch("SELECT * FROM v_incoming_ride_requests")
         requests = []
         for row in rows:
             p_loc = row["pickup_loc"]
             d_loc = row["dropoff_loc"]
-
             requests.append({
                 "tripId": row["trip_id"],
                 "passengerId": row["passenger_id"],
-                "passengerName": row["name"],
+                "passengerName": row["passenger_name"],
                 "passengerPhoneNo": row["phone_no"],
                 "pickup": {"x": p_loc.x, "y": p_loc.y},
                 "dropoff": {"x": d_loc.x, "y": d_loc.y},
@@ -66,26 +53,17 @@ async def checkIncomingRequests(sessionKey: str, db = Depends(get_db)):
 @router.get("/incomingRequests/{id}")
 async def getRideRequestDetails(sessionKey: str, id: int, db = Depends(get_db)):
     validate_session(sessionKey)
-
     async with db.acquire() as conn:
-        query = """
-            select trip_id, passenger_id, pickup_loc, dropoff_loc, estimated_dist, inserted_at
-            from trip
-            where trip_id = $1 and driver_id is null
-        """
-        row = await conn.fetchrow(query, id)
+        row = await conn.fetchrow(
+            "SELECT * FROM v_incoming_ride_requests WHERE trip_id = $1", id)
         if not row:
             raise HTTPException(status_code=404, detail="request not found")
-
-        # Point conversion
         p_loc = row["pickup_loc"]
         d_loc = row["dropoff_loc"]
-
         return {
                 "tripId": row["trip_id"],
                 "passengerId": row["passenger_id"],
                 "pickup": {"x": p_loc.x, "y": p_loc.y},
                 "dropoff": {"x": d_loc.x, "y": d_loc.y},
-                "estimatedDist": float(row["estimated_dist"]) if row["estimated_dist"] else 0.0,
-                "requestedAt": str(row["inserted_at"])
+                "estimatedDist": float(row["estimated_dist"]) if row["estimated_dist"] else 0.0
                 }
