@@ -4,6 +4,16 @@ from schemas import RideRequest, GPSData, RatingData
 
 router = APIRouter(prefix="/rides", tags=["Rides"])
 
+# ── Migration Summary ──────────────────────────────────────────────
+# Procedures: sp_request_ride, sp_cancel_ride, sp_accept_ride, sp_start_ride,
+#             sp_end_ride, sp_confirm_payment, sp_submit_rating, sp_update_gps
+# Views: v_active_ride_status, v_ride_payment_status, v_trip_driver_info,
+#        v_ride_summary, v_public_ride_tracking, v_staff_passenger_list
+# UDFs: fn_calculate_fare (inside sp_end_ride), fn_get_ride_status (inside v_active_ride_status)
+# Triggers: trg_updated_at_trip (removed all manual updated_at = now())
+# Transactions: sp_end_ride (atomic trip end + payment), sp_accept_ride (atomic accept + chat)
+# ───────────────────────────────────────────────────────────────────
+
 @router.post("/")
 async def requestRide(sessionKey: str, rideDetails: RideRequest, db = Depends(get_db)):
     """Called by passenger to request a ride"""
@@ -11,98 +21,47 @@ async def requestRide(sessionKey: str, rideDetails: RideRequest, db = Depends(ge
 
     async with db.acquire() as conn:
         is_passenger = await conn.fetchval(
-                "select 1 from passenger where passenger_id = $1 and is_deleted = false", 
-                userId
-                )
-
+                "SELECT 1 FROM v_staff_passenger_list WHERE passenger_id = $1", userId)
         if not is_passenger:
             raise HTTPException(status_code=403, detail="only passengers can request rides")
 
-
-        # Insert trip
-        query = """
-            insert into trip (passenger_id, pickup_loc, dropoff_loc, estimated_dist)
-            values ($1, point($2, $3), point($4, $5), $6)
-            returning trip_id
-        """
-        trip_id = await conn.fetchval(
-                query, 
-                userId, 
-                rideDetails.pickup_x, 
-                rideDetails.pickup_y, 
-                rideDetails.dropoff_x, 
-                rideDetails.dropoff_y, 
-                rideDetails.dist
-                )
-
-        return {"status": "Ride requested", "tripId": trip_id}
+        row = await conn.fetchrow(
+                "CALL sp_request_ride($1, $2, $3, $4, $5, $6, NULL)",
+                userId, rideDetails.pickup_x, rideDetails.pickup_y,
+                rideDetails.dropoff_x, rideDetails.dropoff_y, rideDetails.dist)
+        return {"status": "Ride requested", "tripId": row[0]}
 
 
 @router.patch("/{id}/cancel")
 async def cancelRide(sessionKey: str, id: int, db = Depends(get_db)):
     validate_session(sessionKey)
-    
     async with db.acquire() as conn:
-        query = "update trip set is_deleted = true, updated_at = now() where trip_id = $1"
-        result = await conn.execute(query, id)
-        
-        if result == "UPDATE 0":
-            raise HTTPException(status_code=404, detail="ride not found")
-            
+        await conn.execute("CALL sp_cancel_ride($1)", id)
         return {"rideId": id, "status": "Cancelled"}
 
 
 @router.get("/{id}")
 async def getRideStatus(sessionKey: str, id: int, db = Depends(get_db)):
-    """Polled by passenger during ride"""
+    """Polled by passenger during ride — uses View with fn_get_ride_status built in"""
     validate_session(sessionKey)
     async with db.acquire() as conn:
-        query = """
-            select t.start_time, t.end_time, t.driver_id, t.is_deleted
-            from trip t
-            where t.trip_id = $1
-        """
-        row = await conn.fetchrow(query, id)
-    
+        row = await conn.fetchrow(
+                "SELECT status FROM v_active_ride_status WHERE trip_id = $1", id)
     if not row:
         raise HTTPException(status_code=404, detail="ride not found")
-        
-    print(row)
-    if row['is_deleted']:
-        return {"Status": "Cancelled"}
-    if row['end_time']:
-        return {"Status": "Completed"}
-    if row['start_time']:
-        return {"Status": "In progress"}
-    if row['driver_id']:
-        return {"Status": "Accepted"}
-    
-    return {"Status": "Pending"}
+    return {"Status": row["status"]}
 
 
 @router.get("/{tripId}/paymentStatus")
 async def getRidePaymentStatus(sessionKey: str, tripId: int, db = Depends(get_db)):
     """Check if the payment for a specific ride has been settled. Validates ownership."""
     passengerId = validate_session(sessionKey)
-
     async with db.acquire() as conn:
-        query = """
-            select pay.is_paid, pay.actual_fare fare, pay.inserted_at processed_at
-            from payment pay
-            join trip t on pay.trip_id = t.trip_id
-            where t.trip_id = $1 
-            and t.passenger_id = $2 
-            and t.is_deleted = false
-        """
-        payment_info = await conn.fetchrow(query, tripId, passengerId)
-        
+        payment_info = await conn.fetchrow(
+                "SELECT * FROM v_ride_payment_status WHERE trip_id = $1 AND passenger_id = $2",
+                tripId, passengerId)
         if not payment_info:
-            raise HTTPException(
-                status_code=404, 
-                detail="Payment information not found or access unauthorized"
-            )
-
-        print(payment_info)
+            raise HTTPException(status_code=404, detail="Payment information not found or access unauthorized")
         return {
             "tripId": tripId,
             "isPaid": payment_info["is_paid"],
@@ -113,20 +72,13 @@ async def getRidePaymentStatus(sessionKey: str, tripId: int, db = Depends(get_db
 
 @router.patch("/{id}/accept")
 async def acceptRideRequest(sessionKey: str, id: int, db = Depends(get_db)):
-    """Called by driver to accept ride request"""
+    """Called by driver to accept ride request — uses FOR UPDATE lock inside procedure"""
     userId = validate_session(sessionKey)
-    
     async with db.acquire() as conn:
-        # Check availability
-        check = await conn.fetchval("select driver_id from trip where trip_id = $1 and is_deleted = false", id)
-        print("(accepting)", check)
-        if check is not None:
+        try:
+            await conn.execute("CALL sp_accept_ride($1, $2)", id, userId)
+        except Exception:
             raise HTTPException(status_code=410, detail="ride already accepted")
-            
-        # link driver and auto-create chat
-        await conn.execute("update trip set driver_id = $1, updated_at = now() where trip_id = $2", userId, id)
-        await conn.execute("insert into chat (trip_id) values ($1)", id)
-        
         return {"rideId": id, "status": "Accepted"}
 
 
@@ -134,36 +86,16 @@ async def acceptRideRequest(sessionKey: str, id: int, db = Depends(get_db)):
 async def getRideLocation(sessionKey: str, tripId: int, db = Depends(get_db)):
     """Polled by passenger to get the latest trip coordinates for map updates"""
     passengerId = validate_session(sessionKey)
-
     async with db.acquire() as conn:
-        query = """
-            select lh.location, lh.timestamp
-            from locationhistory lh
-            join trip t on lh.trip_id = t.trip_id
-            where t.trip_id = $1 
-            and t.passenger_id = $2 
-            and t.is_deleted = false
-            order by lh.timestamp desc
-            limit 1
-        """
-        loc_record = await conn.fetchrow(query, tripId, passengerId)
-        
-        if not loc_record:
-            raise HTTPException(
-                status_code=404, 
-                detail="Location data unavailable"
-            )
-
-        # convert coordinates
-        location = loc_record["location"]
-        
+        loc_record = await conn.fetchrow(
+                "SELECT * FROM v_public_ride_tracking WHERE trip_id = $1", tripId)
+        if not loc_record or not loc_record["latest_location"]:
+            raise HTTPException(status_code=404, detail="Location data unavailable")
+        location = loc_record["latest_location"]
         return {
             "tripId": tripId,
-            "coords": {
-                "lat": location.x, 
-                "lng": location.y
-            },
-            "lastUpdated": str(loc_record["timestamp"])
+            "coords": {"lat": location.x, "lng": location.y},
+            "lastUpdated": str(loc_record["end_time"]) if loc_record["end_time"] else None
         }
 
 
@@ -171,68 +103,38 @@ async def getRideLocation(sessionKey: str, tripId: int, db = Depends(get_db)):
 async def updateLocation(sessionKey: str, id: int, gpsData: GPSData, db = Depends(get_db)):
     """Called continuously by driver during ride"""
     validate_session(sessionKey)
-    
     async with db.acquire() as conn:
-        query = "insert into locationhistory (trip_id, location) values ($1, point($2, $3))"
-        await conn.execute(query, id, gpsData.x, gpsData.y)
-        
+        await conn.execute("CALL sp_update_gps($1, $2, $3)", id, gpsData.x, gpsData.y)
         return {"rideId": id, "location": {"x": gpsData.x, "y": gpsData.y}}
 
 
 @router.patch("/{id}/start")
 async def startRide(sessionKey: str, id: int, db = Depends(get_db)):
     validate_session(sessionKey)
-    
     async with db.acquire() as conn:
-        query = "update trip set start_time = now(), updated_at = now() where trip_id = $1"
-        result = await conn.execute(query, id)
-        
-        if result == "UPDATE 0":
-            raise HTTPException(status_code=404, detail="ride not found")
-            
+        await conn.execute("CALL sp_start_ride($1)", id)
         return {"rideId": id, "status": "In progress"}
 
 
 @router.patch("/{id}/end")
 async def endRide(sessionKey: str, id: int, db = Depends(get_db)):
+    """Atomic: ends trip + calculates fare via fn_calculate_fare + creates payment record"""
     validate_session(sessionKey)
-    
     async with db.acquire() as conn:
-        # Update trip completion
-        await conn.execute("update trip set end_time = now(), updated_at = now() where trip_id = $1", id)
-        
-        # Calculate fare
-        trip_data = await conn.fetchrow("select estimated_dist from trip where trip_id = $1", id)
-        if not trip_data:
-            raise HTTPException(status_code=404, detail="ride not found")
-            
-        dist = float(trip_data['estimated_dist']) if trip_data['estimated_dist'] else 0.0
-        base_fare = 0
-        dist_multiplier = 100
-        total_fare = dist * dist_multiplier
-        
-        # Auto-create payment entry
-        pay_query = """
-            insert into payment (trip_id, base_amount, trip_amount, estimated_fare, actual_fare)
-            values ($1, $2, $3, $4, $4)
-        """
-        await conn.execute(pay_query, id, base_fare, (total_fare - base_fare), total_fare)
-        
-        return {"rideId": id, "status": "Completed", "fare": total_fare}
+        try:
+            result = await conn.fetchrow("CALL sp_end_ride($1, NULL)", id)
+            fare = float(result[0]) if result[0] else 0.0
+            return {"rideId": id, "status": "Completed", "fare": fare}
+        except Exception:
+            raise HTTPException(status_code=404, detail="trip not found or already ended")
 
 
 @router.post("/{id}/confirm-payment")
 async def confirmPayment(sessionKey: str, id: int, db = Depends(get_db)):
     """Called by driver at end of ride to confirm that they've been paid"""
     validate_session(sessionKey)
-    
     async with db.acquire() as conn:
-        query = "update payment set is_paid = true, updated_at = now() where trip_id = $1"
-        result = await conn.execute(query, id)
-        
-        if result == "UPDATE 0":
-            raise HTTPException(status_code=404, detail="payment record not found")
-            
+        await conn.execute("CALL sp_confirm_payment($1)", id)
         return {"id": id, "paymentStatus": "Paid"}
 
 
@@ -240,26 +142,12 @@ async def confirmPayment(sessionKey: str, id: int, db = Depends(get_db)):
 async def getCurrentDriver(sessionKey: str, tripId: int, db = Depends(get_db)):
     """Called by passenger during an active/accepted ride to get driver and vehicle info"""
     passengerId = validate_session(sessionKey)
-
     async with db.acquire() as conn:
-        query = """
-            select u.name as driver_name, d.phone_no, v.make, v.model, v.plate_no
-            from trip t
-            join appuser u on t.driver_id = u.user_id
-            join driver d on t.driver_id = d.driver_id
-            left join vehicle v on d.driver_id = v.driver_id
-            where t.trip_id = $1
-            and t.passenger_id = $2
-            and t.is_deleted = false
-        """
-        driver_info = await conn.fetchrow(query, tripId, passengerId)
-        
+        driver_info = await conn.fetchrow(
+                "SELECT * FROM v_trip_driver_info WHERE trip_id = $1 AND passenger_id = $2",
+                tripId, passengerId)
         if not driver_info:
-            raise HTTPException(
-                status_code=404, 
-                detail="Invalid ride or access unauthorized"
-            )
-
+            raise HTTPException(status_code=404, detail="Invalid ride or access unauthorized")
         return dict(driver_info)
 
 
@@ -267,44 +155,25 @@ async def getCurrentDriver(sessionKey: str, tripId: int, db = Depends(get_db)):
 async def getCompletedRideSummary(sessionKey: str, id: int, db = Depends(get_db)):
     validate_session(sessionKey)
     async with db.acquire() as conn:
-        query = """
-            select t.passenger_id, p.name as passenger_name, t.driver_id, d.name as driver_name,
-            t.start_time, t.end_time,
-            t.pickup_loc, t.dropoff_loc,
-            t.actual_dist distance,
-            pay.base_amount, pay.trip_amount, pay.actual_fare total_fare
-            from trip t
-            join appuser p on t.passenger_id = p.user_id
-            left join appuser d on t.driver_id = d.user_id
-            left join payment pay on t.trip_id = pay.trip_id
-            where t.trip_id = $1
-        """
-        summary = await conn.fetchrow(query, id)
+        summary = await conn.fetchrow(
+                "SELECT * FROM v_ride_summary WHERE trip_id = $1", id)
         if not summary:
             raise HTTPException(status_code=404, detail="ride not found")
-
         res = dict(summary)
-        # Point conversion
         res["pickup_loc"] = {"x": summary["pickup_loc"].x, "y": summary["pickup_loc"].y}
         res["dropoff_loc"] = {"x": summary["dropoff_loc"].x, "y": summary["dropoff_loc"].y}
-        # DateTime to string
         res["start_time"] = str(summary["start_time"])
         res["end_time"] = str(summary["end_time"]) if summary["end_time"] else None
-        # Decimal to float
         res["distance"] = float(summary["distance"]) if summary["distance"] else 0.0
         res["base_amount"] = float(summary["base_amount"]) if summary["base_amount"] else 0.0
         res["trip_amount"] = float(summary["trip_amount"]) if summary["trip_amount"] else 0.0
         res["total_fare"] = float(summary["total_fare"]) if summary["total_fare"] else 0.0
-        
         return res
 
 
 @router.post("/{id}/rate")
 async def rateDriver(sessionKey: str, id: int, ratingData: RatingData, db = Depends(get_db)):
     validate_session(sessionKey)
-    
     async with db.acquire() as conn:
-        query = "insert into rating (trip_id, score, feedback) values ($1, $2, $3)"
-        await conn.execute(query, id, ratingData.score, ratingData.feedback)
-        
+        await conn.execute("CALL sp_submit_rating($1, $2, $3)", id, ratingData.score, ratingData.feedback)
         return {"rideId": id, "status": "Rating submitted"}
