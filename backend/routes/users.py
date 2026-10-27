@@ -4,155 +4,85 @@ from schemas import PassengerUpdate, DriverUpdate, VehicleUpdate
 
 router = APIRouter(prefix="/users", tags=["User Profiles"])
 
+# ── Migration Summary ──────────────────────────────────────────────
+# Procedures: sp_update_passenger_profile, sp_update_driver_profile, sp_upsert_vehicle
+# Views: v_passenger_profile, v_driver_public_profile, v_driver_ratings
+# UDFs: fn_average_driver_rating (inside v_driver_public_profile)
+# Triggers: trg_updated_at_* (removed all manual updated_at)
+# Transactions: sp_update_passenger_profile, sp_update_driver_profile (atomic multi-table)
+# ───────────────────────────────────────────────────────────────────
 
 # Passenger
 @router.get("/me/passenger/profile")
 async def viewPassengerProfile(sessionKey: str, userId: int, db = Depends(get_db)):
     """Passenger views their own profile details and ride history stats"""
     validate_session(sessionKey)
-
     async with db.acquire() as conn:
-        query = """
-            select u.name, p.phone_no, p.cnic,p.inserted_at as member_since,
-                (select count(*) from trip where passenger_id = $1 and is_deleted = false) as total_trips,
-                (select round(avg(r.score), 2) 
-                from rating r 
-                join trip t on r.trip_id = t.trip_id 
-                where t.passenger_id = $1 and r.is_deleted = false) as avg_rating
-            from appuser u
-            join passenger p on u.user_id = p.passenger_id
-            where u.user_id = $1 and p.is_deleted = false
-        """
-        profile = await conn.fetchrow(query, userId)
-        
+        profile = await conn.fetchrow(
+            "SELECT * FROM v_passenger_profile WHERE user_id = $1", userId)
         if not profile:
             raise HTTPException(status_code=404, detail="Passenger profile not found")
-
-        # Format data
         result = dict(profile)
         result["member_since"] = str(result["member_since"])
         result["avg_rating"] = float(result["avg_rating"]) if result["avg_rating"] else 0.0
-        
         return result
 
 
 @router.patch("/me/passenger")
 async def updatePassengerProfile(sessionKey: str, updates: PassengerUpdate, db = Depends(get_db)):
-    """Update passenger profile data"""
+    """Update passenger profile data — atomic via sp_update_passenger_profile"""
     userId = validate_session(sessionKey)
-    
     async with db.acquire() as conn:
-        # verify existence
         is_passenger = await conn.fetchval(
-            "select 1 from passenger where passenger_id = $1 and is_deleted = false", 
-            userId
-        )
+            "SELECT 1 FROM v_staff_passenger_list WHERE passenger_id = $1", userId)
         if not is_passenger:
             raise HTTPException(status_code=403, detail="user is not a registered passenger")
-
-        # Update AppUser table (Core attributes)
-        if updates.name:
-            await conn.execute(
-                "update appuser set name = $1 where user_id = $2",
-                updates.name, userId
-            )
-
-        # Update Passenger table (Role-specific attributes)
-        if updates.name or updates.cnic or updates.phone:
-            # We use coalesce here so that if a field isn't provided in the request, 
-            # it keeps its current value in the database.
-            query = """
-                update passenger 
-                    set cnic = coalesce($1, cnic), 
-                    phone_no = coalesce($2, phone_no) 
-                where passenger_id = $3
-            """
-            await conn.execute(
-                query, 
-                updates.cnic, 
-                updates.phone, 
-                userId
-            )
-            
+        await conn.execute(
+            "CALL sp_update_passenger_profile($1, $2, $3, $4)",
+            userId, updates.name, updates.cnic, updates.phone)
         return {"status": "Passenger profile updated"}
 
 
 # Driver
 @router.patch("/me/driver")
 async def updateDriverProfile(sessionKey: str, updates: DriverUpdate, db = Depends(get_db)):
-    """Update driver-specific profile and phone number"""
+    """Update driver-specific profile — atomic via sp_update_driver_profile"""
     userId = validate_session(sessionKey)
-
     async with db.acquire() as conn:
-        # Verify role
-        is_driver = await conn.fetchval("select 1 from driver where driver_id = $1", userId)
+        is_driver = await conn.fetchval(
+            "SELECT 1 FROM v_driver_public_profile WHERE driver_id = $1", userId)
         if not is_driver:
             raise HTTPException(status_code=403, detail="user is not a registered driver")
-
-        # Update name in AppUser
-        if updates.name:
-            await conn.execute("update appuser set name = $1 where user_id = $2", updates.name, userId)
-
-        # Update phone in Driver table
-        if updates.phone_no:
-            await conn.execute("update driver set phone_no = $1 where driver_id = $2", updates.phone_no, userId)
-
+        await conn.execute(
+            "CALL sp_update_driver_profile($1, $2, $3)",
+            userId, updates.name, updates.phone_no)
         return {"status": "Driver profile updated"}
 
 
 @router.patch("/me/vehicle")
 async def updateVehicle(sessionKey: str, vehicleData: VehicleUpdate, db = Depends(get_db)):
+    """Upsert vehicle — ON CONFLICT handled natively in sp_upsert_vehicle"""
     userId = validate_session(sessionKey)
-    
     async with db.acquire() as conn:
-        # Role Check
-        is_driver = await conn.fetchval("select 1 from driver where driver_id = $1", userId)
+        is_driver = await conn.fetchval(
+            "SELECT 1 FROM v_driver_public_profile WHERE driver_id = $1", userId)
         if not is_driver:
             raise HTTPException(status_code=403, detail="not a driver")
-
-        # Does a vehicle already exist for this driver?
-        exists = await conn.fetchval("select 1 from vehicle where driver_id = $1", userId)
-
-        if exists:
-            #Update
-            query = """
-                update vehicle set 
-                    make = $1, model = $2, engine_no = $3, chassis_no = $4, 
-                    plate_no = $5, owner_name = $6, owner_cnic = $7
-                where driver_id = $8
-            """
-            await conn.execute(query, vehicleData.make, vehicleData.model, vehicleData.engine_no, 
-                               vehicleData.chassis_no, vehicleData.plate_no, vehicleData.owner_name, 
-                               vehicleData.owner_cnic, userId)
-        else:
-            # insert
-            query = """
-                insert into vehicle (driver_id, make, model, engine_no, chassis_no, plate_no, owner_name, owner_cnic)
-                values ($1, $2, $3, $4, $5, $6, $7, $8)
-            """
-            await conn.execute(query, userId, vehicleData.make, vehicleData.model, vehicleData.engine_no, 
-                               vehicleData.chassis_no, vehicleData.plate_no, vehicleData.owner_name, 
-                               vehicleData.owner_cnic)
-
+        await conn.execute(
+            "CALL sp_upsert_vehicle($1, $2, $3, $4, $5, $6, $7, $8)",
+            userId, vehicleData.make, vehicleData.model, vehicleData.engine_no,
+            vehicleData.chassis_no, vehicleData.plate_no, vehicleData.owner_name,
+            vehicleData.owner_cnic)
         return {"status": "Vehicle updated"}
-
 
 
 @router.get("/{userId}/profile")
 async def viewDriverProfile(sessionKey: str, userId: int, db = Depends(get_db)):
     """View public driver profile, car info, and trip count"""
     validate_session(sessionKey)
-
     async with db.acquire() as conn:
-        query = """
-            select u.name, d.phone_no, v.make, v.model, v.plate_no,
-               (select count(*) from trip where driver_id = $1) as total_trips
-            from appuser u
-            join driver d on u.user_id = d.driver_id
-            left join vehicle v on d.driver_id = v.driver_id
-            where u.user_id = $1 and d.is_deleted = false
-        """
-        profile = await conn.fetchrow(query, userId)
+        profile = await conn.fetchrow(
+            "SELECT * FROM v_driver_public_profile WHERE driver_id = $1", userId)
         if not profile:
             raise HTTPException(status_code=404, detail="driver not found")
         return dict(profile)
@@ -160,42 +90,22 @@ async def viewDriverProfile(sessionKey: str, userId: int, db = Depends(get_db)):
 
 @router.get("/{userId}/ratings")
 async def viewDriverRatings(sessionKey: str, userId: int, db = Depends(get_db)):
-    """Called by passenger to view driver ratings"""
+    """Called by passenger to view driver ratings — uses View + UDF"""
     validate_session(sessionKey)
-
     async with db.acquire() as conn:
-        query = """
-            select r.score, r.feedback, r.inserted_at rated_at
-            from rating r
-            join trip t on r.trip_id = t.trip_id
-            where t.driver_id = $1 and r.is_deleted = false
-        """
-        rows = await conn.fetch(query, userId)
-
+        rows = await conn.fetch(
+            "SELECT * FROM v_driver_ratings WHERE driver_id = $1", userId)
         if not rows:
-            return {
-                    "average_rating": 0.0,
-                    "total_reviews": 0,
-                    "reviews": []
-                    }
-
-        # Accumulate score
-        total_score = 0
-        reviews_list = []
-
-        for row in rows:
-            total_score += row['score']
-            reviews_list.append({
-                "score": row['score'],
-                "feedback": row['feedback'],
-                "date": str(row['rated_at']) # String conversion for JSON safety
-                })
-
-        # Get average rating
-        avg_rating = total_score / len(rows)
-
+            return {"average_rating": 0.0, "total_reviews": 0, "reviews": []}
+        avg = await conn.fetchval(
+            "SELECT fn_average_driver_rating($1)", userId)
+        reviews_list = [{
+            "score": row['score'],
+            "feedback": row['feedback'],
+            "date": str(row['rated_at'])
+        } for row in rows]
         return {
-                "average_rating": round(avg_rating, 2),
-                "total_reviews": len(rows),
-                "reviews": reviews_list
-                }
+            "average_rating": float(avg) if avg else 0.0,
+            "total_reviews": len(rows),
+            "reviews": reviews_list
+        }

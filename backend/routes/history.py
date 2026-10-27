@@ -3,42 +3,35 @@ from dependencies import get_db, validate_session
 
 router = APIRouter(prefix="/history", tags=["Trip History"])
 
+# ── Migration Summary ──────────────────────────────────────────────
+# Views: v_driver_earnings, v_trip_history_detail
+# UDFs: fn_driver_total_earnings (replaces Python accumulator loop)
+# Procedures: None (all endpoints are read-only)
+# ───────────────────────────────────────────────────────────────────
+
 @router.get("/summary")
 async def viewEarnings(sessionKey: str, driverId: int, db = Depends(get_db)):
-    # Return exception if not logged in, or trying to view earnings of some other user
     sessionUserId = validate_session(sessionKey)
     if sessionUserId != driverId:
         raise HTTPException(status_code=403, detail="forbidden")
 
     async with db.acquire() as conn:
-        query = """
-            select p.trip_id, p.actual_fare
-            from payment p
-            join trip t on p.trip_id = t.trip_id
-            where t.driver_id = $1
-            and p.is_paid = true
-            and p.is_deleted = false
-        """
-        rows = await conn.fetch(query, driverId)
-
-        # return empty list if no records
+        rows = await conn.fetch(
+            "SELECT * FROM v_driver_earnings WHERE driver_id = $1 AND is_paid = true",
+            driverId)
         if not rows:
             return []
 
-        earnings_list = []
-        total_sum = 0.0
+        # Use UDF for total instead of Python loop
+        total = await conn.fetchval("SELECT fn_driver_total_earnings($1)", driverId)
 
-        for row in rows:
-            fare = float(row["actual_fare"]) if row["actual_fare"] else 0.0
-            total_sum += fare
-            earnings_list.append({
-                "tripId": row["trip_id"],
-                "rideFare": fare
-                })
+        earnings_list = [{
+            "tripId": row["trip_id"],
+            "rideFare": float(row["actual_fare"]) if row["actual_fare"] else 0.0
+        } for row in rows]
 
-        # Return earnings and a summary
         return {
-                "totalEarnings": round(total_sum, 2),
+                "totalEarnings": float(total) if total else 0.0,
                 "count": len(earnings_list),
                 "items": earnings_list
                 }
@@ -51,16 +44,9 @@ async def getPastTrips(sessionKey: str, driverId: int, db = Depends(get_db)):
         raise HTTPException(status_code=403, detail="forbidden")
 
     async with db.acquire() as conn:
-        query = """
-            select t.trip_id, t.start_time, t.pickup_loc, t.dropoff_loc, p.actual_fare
-            from trip t
-            join payment p on t.trip_id = p.trip_id
-            where t.driver_id = $1
-            and t.is_deleted = false
-            order by t.start_time desc
-        """
-        rows = await conn.fetch(query, driverId)
-
+        rows = await conn.fetch(
+            "SELECT * FROM v_driver_earnings WHERE driver_id = $1 ORDER BY start_time DESC",
+            driverId)
         trips = []
         for row in rows:
             p_loc = row["pickup_loc"]
@@ -78,26 +64,13 @@ async def getPastTrips(sessionKey: str, driverId: int, db = Depends(get_db)):
 @router.get("/rides/{id}")
 async def getPastTripDetails(sessionKey: str, id: int, db = Depends(get_db)):
     validate_session(sessionKey)
-
     async with db.acquire() as conn:
-        query = """
-            select
-            t.trip_id, t.start_time, t.end_time, t.pickup_loc, t.dropoff_loc, t.actual_dist,
-            p.base_amount, p.trip_amount, p.actual_fare, p.is_paid,
-            p_user.name as passenger_name
-            from trip t
-            left join payment p on t.trip_id = p.trip_id
-            join appuser p_user on t.passenger_id = p_user.user_id
-            where t.trip_id = $1
-        """
-        row = await conn.fetchrow(query, id)
-
+        row = await conn.fetchrow(
+            "SELECT * FROM v_trip_history_detail WHERE trip_id = $1", id)
         if not row:
             raise HTTPException(status_code=404, detail="trip not found")
-
         p_loc = row["pickup_loc"]
         d_loc = row["dropoff_loc"]
-
         return {
                 "tripId": row["trip_id"],
                 "startTime": str(row["start_time"]),
